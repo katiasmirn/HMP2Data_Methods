@@ -61,3 +61,4 @@ If you have questions, comments, or suggestions you feel free to contact John St
 =======
 If you have questions, comments, or suggestions you feel free to contact John Stansfield (stansfieldjc[at]vcu[dot]edu) or Ekaterina Smirnova  (ekaterina.smirnova[at]vcuhealth[dot]org) %Mikhail Dozmorov (mikhail.dozmorov[at]vcuhealth[dot]org).
 >>>>>>> upstream/master
+# HMP2Data_Methods

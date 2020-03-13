@@ -1685,15 +1685,14 @@ $(document).ready(function () {
 </ul>
 <p>The shell script <code>ascp-commands_stirrups_MOMS-PI.sh</code> used to download the stirrups data with aspera crient <code>Aspera cli</code> using terminal command line executable <code>ascp</code> is availale in the <code>Scripts/</code> folder.</p>
 </div>
-<div id="in-terminal" class="section level2">
-<h2>In Terminal:</h2>
-<ul>
-<li>merge all into one file using concatenate function</li>
-<li>Terminal Code: <span class="math inline">\(cat *.stirrups.profile.txt &gt; MOMS_PI_allstirrups_quotes.txt&quot;\)</span></li>
-<li>get rid of quotes, which cause issues later in R</li>
-<li>Note, you could use the -i flag to avoid another file, but this sometimes has issues on Macs</li>
-<li>Terminal Code: <span class="math inline">\(sed 's/\&quot;//g' MOMS_PI_allstirrups_quotes.txt &gt; MOMS_PI_allstirrups.txt&quot;\)</span></li>
-</ul>
+<div id="processing-downloaded-data" class="section level2">
+<h2>Processing downloaded data</h2>
+<p>Each sample is downloaded as a separate file, which needs to be further reshaped into the single file (long format) that combines all samples using the set of unic commands documebted in <code>UnixScript.rtf</code> file in the <code>Scripts/</code> folder.</p>
+<p>In terminal: * merge all into one file using concatenate function * Terminal Code: <span class="math inline">\(cat *.stirrups.profile.txt &gt; MOMS_PI_allstirrups_quotes.txt&quot;\)</span> * get rid of quotes, which cause issues later in R * Note, you could use the -i flag to avoid another file, but this sometimes has issues on Macs * Terminal Code: <span class="math inline">\(sed 's/\&quot;//g' MOMS_PI_allstirrups_quotes.txt &gt; MOMS_PI_allstirrups.txt&quot;\)</span></p>
+<pre class="r"><code>rm(list=ls())
+library(data.table)
+library(tidyr)
+library(dplyr)</code></pre>
 <pre><code>## 
 ## Attaching package: 'dplyr'</code></pre>
 <pre><code>## The following objects are masked from 'package:data.table':
@@ -1705,6 +1704,9 @@ $(document).ready(function () {
 <pre><code>## The following objects are masked from 'package:base':
 ## 
 ##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(stringr)
+library(phyloseq)
+library(here)</code></pre>
 <pre><code>## here() starts at /Users/ekaterinasmirnova/Dropbox/Ni/HMP2paper/HMP2Data_Methods</code></pre>
 </div>
 <div id="r-script-to-parse-stirrups-file" class="section level2">

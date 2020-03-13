@@ -1,5 +1,19 @@
 # HMP2Data_Methods
 
+## Purpose of Project
+
+* MOMS-PI Qiime Pipeline
+    + Most data for the MOMS-PI project was processed through the Qiime pipeline
+    + However, data for the vaginal microbiome were not correctly processed through this pipeline
+* Stirrups File
+    + Correctly processed vaginal microbiome sequence data
+    + Project data however is not preprocessed
+* Project Aims
+    + Preprocess this Stirrups data
+    + Release each preprocessed portion as an RDA file available for public download
+    + Release a cleaned phyloseq object for the data that encapsulates all portions of the data into one
+    + Allow for researchers to replicate these methods and adjust methods as they see fit
+    
 ## Downloading the data
 
 All publicly available stirrups data were downloaded from the Human Microbiome Project Data Portal (https://portal.hmpdacc.org/) on 01/03/2020. Specifically, "Project: Integrative Human Microbiome Project" was selected, followed by the selection of the study "MOMS-PI" (Multi-Omics Microbiome Study - Pregnancy Initiative). Subsequent filters were applied to obtain "stirrups profile" data (16S data with VCU vaginal custom data base community assignment) in txt format. 

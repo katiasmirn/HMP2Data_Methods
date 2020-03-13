@@ -22,11 +22,14 @@ Mention how you have to run the scripts in the same folder as where you download
     + Release a cleaned phyloseq object for the data that encapsulates all portions of the data into one
     + Allow for researchers to replicate these methods and adjust methods as they see fit
     
-## Downloading Stirrups Files Online
+## Stirrups data download workflow
+
 * In order to download the stirrups data:
     + https://portal.hmpdacc.org, select "Data", Samples/Studies select MOMS-PI, Files/Format select "tbl", Files/Matrix Type select "16s_community"
-    + Format: Study Name IS MOMS-PI AND File Format IS tbl AND File Matrix Type IS 16s_community 
+    + Format: Study Name IS MOMS-PI AND File Format IS tbl AND File Matrix Type IS 16s_community
     + Download Stirrups data: ./hmp_client/bin/manifest2ascp.py --manifest=data.MOMS-PI/hmp_cart_2ae82fd042.tsv --user=username --password=password --ascp_path=/path/to/ascp/bin/ascp --ascp_options="-l 200M" > ascp-commands_biom_16S_MOMS-PI.sh
+
+The shell script `ascp-commands_stirrups_MOMS-PI.sh` used  to download the stirrups data with aspera crient `Aspera cli` using terminal command line executable `ascp` is availale in the `Scripts/` folder. 
 
 ## In Terminal:
 

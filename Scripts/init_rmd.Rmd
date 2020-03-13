@@ -47,7 +47,7 @@ library(here)
 ```
 
 
-```{r}
+```{r, echo=FALSE, eval=FALSE}
 path <- "Documents/moms/"
 path2 <- "Documents/MOMS-PI/71694/PhenoGenotypeFiles/RootStudyConsentSet_phs001523.MOMS_PI.v1.p1.c1.DS-PREG-COM-IRB-PUB-MDS/PhenotypeFiles/"
 ```
@@ -57,7 +57,8 @@ This script is used to parse the text file produced from the bash code into an O
 This file is composed of 2055 samples of 360 taxa. This OTU matrix is then saved as an RDA file, which can be found on the github repository. 
 
 ```{r}
-MOMSPI_stirrups<- as.data.frame(fread("stirrups.profile/hmqcp/MOMS_PI_allstirrups.txt"),sep="\t",header=FALSE,quote="")
+#Add here
+MOMSPI_stirrups<- as.data.frame(fread(here("data","MOMS_PI_allstirrups.txt")),sep="\t",header=FALSE,quote="")
 colnames(MOMSPI_stirrups)<- c("Sample_Name","Taxon","Threshold_Status","No_Reads","Percent_Abundance","Average_Identity")
 #For normalizing to only to those that had a hit (AT only)
 #This might be the default, but we might also want to incorporate an option for all reads, including those without a hit
@@ -79,7 +80,8 @@ We will update this taxa table with all taxonomic information.
 
 ```{r}
 #load("HMP2Data/data/momspi16S_mtx.rda")
-load("HMP2Data/data/momspi16S_samp.rda")
+#Add here
+load(here("data","momspi16S_samp.rda"))
 #load("HMP2Data/data/momspi16S_tax.rda")
 
 #

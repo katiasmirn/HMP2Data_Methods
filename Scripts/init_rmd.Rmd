@@ -31,8 +31,11 @@ Mention how you have to run the scripts in the same folder as where you download
 
 The shell script `ascp-commands_stirrups_MOMS-PI.sh` used  to download the stirrups data with aspera crient `Aspera cli` using terminal command line executable `ascp` is availale in the `Scripts/` folder. 
 
-## In Terminal:
+## Processing downloaded data
 
+Each sample is downloaded as a separate file, which needs to be further reshaped into the single file (long format) that combines all samples using the set of unic commands documebted in `UnixScript.rtf` file in the `Scripts/` folder.
+
+In terminal:
 * merge all into one file using concatenate function
 * Terminal Code: $cat *.stirrups.profile.txt > MOMS_PI_allstirrups_quotes.txt"$
 * get rid of quotes, which cause issues later in R

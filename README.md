@@ -12,8 +12,11 @@ Detailed instructions on data download are documented in the `init_rmd.Rmd` file
 
 ## Processing downloaded data
 
-Each sample 
+Each sample is downloaded as a separate file, which needs to be further reshaped into the single file (long format) that combines all samples using the set of unic commands documented in `UnixScript.rtf` file in the `Scripts/` folder. 
 
+The 16S is typically formatted for statistical analysis as a taxa table with taxa in rows and samples in columns. The script used to concert the long format `MOMS_Cleaning.R` into a taxa table is available in the `Scripts/` folder. 
+
+Detailed instructions on using the unix `UnixScript.rtf` and `R`  `MOMS_Cleaning.R` scripts are available in `init_rmd.Rmd` file in the `Scripts/` folder.
 
 ## Contact information
 

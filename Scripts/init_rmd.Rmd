@@ -1,0 +1,126 @@
+---
+title: "Stirrups Phyloseq Creation"
+output:
+  html_document:
+    df_print: paged
+---
+Take attempt on writing descriptions and reports for this file, mention processing through Qiime, put link to files, download date, project name, what is being done, why it's being done, and the final result and roughly how it was come up with. Specify the filters, gives the stirrups file, using aspera cli, use their wording on how to download aspera-cli, reference link to aspera-cli script (dump into github). Make one short paragraph.
+
+Step by step process on how to download the files, main bullets and subbullets
+Mention how you have to run the scripts in the same folder as where you downloaded the files, mention file paths
+
+## Purpose of Project
+* MOMS-PI Qiime Pipeline
+    + Most data for the MOMS-PI project was processed through the Qiime pipeline
+    + However, data for the vaginal microbiome were not correctly processed through this pipeline
+* Stirrups File
+    + Correctly processed vaginal microbiome sequence data
+    + Project data however is not preprocessed
+* Project Aims
+    + Preprocess this Stirrups data
+    + Release each preprocessed portion as an RDA file available for public download
+    + Release a cleaned phyloseq object for the data that encapsulates all portions of the data into one
+    + Allow for researchers to replicate these methods and adjust methods as they see fit
+    
+## Downloading Stirrups Files Online
+* In order to download the stirrups data:
+    + https://portal.hmpdacc.org, select "Data", Samples/Studies select MOMS-PI, Files/Format select "tbl", Files/Matrix Type select "16s_community"
+    + Format: Study Name IS MOMS-PI AND File Format IS tbl AND File Matrix Type IS 16s_community 
+    + Download Stirrups data: ./hmp_client/bin/manifest2ascp.py --manifest=data.MOMS-PI/hmp_cart_2ae82fd042.tsv --user=username --password=password --ascp_path=/path/to/ascp/bin/ascp --ascp_options="-l 200M" > ascp-commands_biom_16S_MOMS-PI.sh
+
+## In Terminal:
+
+* merge all into one file using concatenate function
+* Terminal Code: $cat *.stirrups.profile.txt > MOMS_PI_allstirrups_quotes.txt"$
+* get rid of quotes, which cause issues later in R
+* Note, you could use the -i flag to avoid another file, but this sometimes has issues on Macs
+* Terminal Code: $sed 's/\"//g' MOMS_PI_allstirrups_quotes.txt > MOMS_PI_allstirrups.txt"$
+
+```{r, echo=FALSE, results='hide'}
+rm(list=ls())
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(phyloseq)
+```
+
+
+```{r}
+path <- "Documents/moms/"
+path2 <- "Documents/MOMS-PI/71694/PhenoGenotypeFiles/RootStudyConsentSet_phs001523.MOMS_PI.v1.p1.c1.DS-PREG-COM-IRB-PUB-MDS/PhenotypeFiles/"
+```
+
+## R Script to parse stirrups file
+This script is used to parse the text file produced from the bash code into an OTU file of the stirrups file
+This file is composed of 2055 samples of 360 taxa. This OTU matrix is then saved as an RDA file, which can be found on the github repository. 
+
+```{r}
+MOMSPI_stirrups<- as.data.frame(fread("stirrups.profile/hmqcp/MOMS_PI_allstirrups.txt"),sep="\t",header=FALSE,quote="")
+colnames(MOMSPI_stirrups)<- c("Sample_Name","Taxon","Threshold_Status","No_Reads","Percent_Abundance","Average_Identity")
+#For normalizing to only to those that had a hit (AT only)
+#This might be the default, but we might also want to incorporate an option for all reads, including those without a hit
+MOMSPI_stirrups_ATonly<-subset(MOMSPI_stirrups,MOMSPI_stirrups$`Threshold_Status`=="AT")
+MOMSPI_stirrups_ATonly_forwide<-MOMSPI_stirrups_ATonly
+MOMSPI_stirrups_ATonly_forwide$Threshold_Status<-NULL
+MOMSPI_stirrups_ATonly_forwide$Percent_Abundance<-NULL
+MOMSPI_stirrups_ATonly_forwide$Average_Identity<-NULL
+momspi <- as.data.frame(spread(MOMSPI_stirrups_ATonly_forwide,key = Taxon, value = No_Reads))
+rownames(momspi) <- momspi[,1]
+momspi[,1] <- NULL
+save(momspi, file = "stirrups_OTU.rda")
+```
+
+## Stirrups Taxa File Creation
+This R scipt creates a taxa file composed only of the genus and species of the 360 taxa found in the OTU table. As information for the kingdom, phylum, class, order, and family for each taxa was unavailable, these columns were filled with NA. This script produces a matrix of 360 observations, each taxon, and 7 columns, taxonomic classification, which is then saved as an RDA file. This can be located on the github repository.
+
+We will update this taxa table with all taxonomic information. 
+
+```{r}
+#load("HMP2Data/data/momspi16S_mtx.rda")
+load("HMP2Data/data/momspi16S_samp.rda")
+#load("HMP2Data/data/momspi16S_tax.rda")
+
+#
+fName <- colnames(momspi)
+both <- str_split_fixed(fName, "_", n = 2)
+Genus <- both[,1]
+Species <- both[,2]
+
+Kingdom <- rep(NA, 360)
+Phylum <- rep(NA ,360)
+Class <- rep(NA, 360)
+Order <- rep(NA, 360)
+Family <- rep(NA, 360)
+moms_taxa <- data.frame(Kingdom, Phylum, Class, Order, Family, Genus, Species, row.names = fName) #full taxa with genus, species, and full taxa name
+taxa <- as.matrix(moms_taxa)
+save(taxa, file = "stirrups_taxa.rda")
+```
+
+## Stirrups Sample Metadata File Creation
+This R scipt creates a metadata file composed of 13 columns of information (e.g visit_number, subject_race, subject_gender, etc.) for each of the 2055 samples. This script uses the information found in the momspi16S_samp.rda file to construct the metadata file for the 2055 Stirrups samples. 15 samples found in the Stirrups file were not listed in the momspi16S_samp file. Each of these samples were filled in with NA's for each column, as there was no further information on these samples. This leads to a matrix composed of 2055 observations of 13 variables. This is then saved into an RDA file, which can be located on the github repository.
+
+```{r}
+meta_sub <- momspi16S_samp[rownames(momspi16S_samp) %in% rownames(momspi),] 
+#15 samples missing, fill in sample rows with NA's for these missing ones
+missing <- which(!rownames(momspi) %in% rownames(meta_sub))
+names <- c(rownames(momspi[missing,]))
+meta_sub[nrow(meta_sub) + length(missing),] <- NA
+firstNames <- rownames(meta_sub[1:2040,])
+allNames <- c(firstNames, names)
+rownames(meta_sub) <- allNames
+#meta_sub should have all samples in the dataset
+save(meta_sub, file = "stirrups_samps.rda")
+```
+
+## Stirrups Phyloseq Object Creation
+This R script takes the Stirrups OTU, taxa, and sample metadata file and creates a phyloseq object from these three matrices. This is then saved as an RDS file, which is located on the github repository. 
+
+```{r}
+#Create phyloseq object:
+OTU = otu_table(t(momspi), taxa_are_rows = TRUE)
+TAX = tax_table(taxa)
+SAMPLES = sample_data(meta_sub)
+carbom <- phyloseq(OTU, TAX, SAMPLES)
+saveRDS(carbom, file = "stirrups_phyloseq.RDS")
+```

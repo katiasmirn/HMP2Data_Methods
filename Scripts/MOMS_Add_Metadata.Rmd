@@ -1,0 +1,155 @@
+---
+title: "MOMS_Add_Metadata"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+mount -t smbfs  //'rams;eid'@rams.adp.vcu.edu/som/shares/Biostatistics/Projects/MOMS-PI ~/local_folder_path/MOMS-PI
+
+
+```{r cars}
+rm(list=ls())
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(here)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+path2 <- "~/Documents/MOMS-PI/71694/PhenoGenotypeFiles/RootStudyConsentSet_phs001523.MOMS_PI.v1.p1.c1.DS-PREG-COM-IRB-PUB-MDS/PhenotypeFiles/"
+load(here("data","stirrups_OTU.rda"))
+load(here("data", "stirrups_samps.rda"))
+newmoms <- rownames(meta_sub)
+```
+
+```{r }
+header.true <- function(df) {
+  names(df) <- as.character(unlist(df[1,]))
+  df[-1,]
+}
+```
+
+```{r }
+filelist = list.files(path = path2, pattern = ".*.txt$")
+
+blah <- read.table(paste(path2, filelist[9], sep=""), fill = TRUE, header = FALSE, sep = "", dec = ".")
+blah <- header.true(blah)
+names(blah)
+
+#See which from custom database are in the biostat server text file sample id's
+check <- meta_sub[newmoms %in% blah$SAMPLE_ID,] #2055 obs x 13 variables (so all samples in custom are captured)
+#blank <- merge(check, blah)
+samps <- blah[blah$SAMPLE_ID %in% newmoms,]
+
+
+try <- read.table(paste(path2, filelist[2], sep=""), fill = TRUE, header = FALSE, sep = "", dec = ".")
+try <- header.true(try)
+hope <- merge(samps, try)
+
+visit_ID <- str_split_fixed(hope$SAMPLE_ID, "_MV1D", n = 2)[,1]
+hope["visit_ID"] <- c(visit_ID)
+
+one <- read.table(paste(path2, filelist[1], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+one <- header.true(one)
+hope <- merge(hope,one)
+
+#for (i in 3:8) {
+#  exa <- read.table(paste(path2, filelist[i], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+#  exa <- header.true(exa)
+#  hope <- merge(x = hope, y = exa, by = "visit_ID", all.x = TRUE)
+#}
+
+na.test <-  function (x) {
+  w <- sapply(x, function(x)all(is.na(x)))
+  if (any(w)) {
+    stop(paste("All NA in columns", paste(which(w), collapse=", ")))
+  }
+}
+
+na.test(hope)
+
+three <- read.table(paste(path2, filelist[3], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+three <- header.true(three)
+visits <- three$visit_ID
+
+#which(hope$SUBJECT_ID %in% three$SUBJECT_ID)
+hope <- merge(x = hope, y = three, all.x = TRUE)
+#Look at why, row 6 and 22. Why do these have a different dbGaP_Sample_ID and SAMPLE_ID when they seem 
+#the exact same sample. Why is this sample also named K10 and K40 when it's visit 6 
+
+
+four <- read.table(paste(path2, filelist[4], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+four <- header.true(four)
+names(four)
+hope <- merge(x = hope, y = four, all.x = TRUE) 
+#Merged correctly until here
+
+#Doesn't merge correctly
+five <- read.table(paste(path2, filelist[5], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+five <- header.true(five)
+#five <- short(five)
+ind <- which(names(five) %in% names(hope))
+visit <- which(names(five) == "visit_ID")
+count <- 0
+for (i in ind){
+  i <- i - count
+  if(i != (visit-count)){
+    five <- five[,-i]
+    count <- count + 1
+  }
+}
+hope <- merge(x = hope, y = five, by = "visit_ID", all.x=TRUE)
+na.test(hope)
+
+six <- read.table(paste(path2, filelist[6], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+six <- header.true(six)
+ind <- which(names(six) %in% names(hope))
+visit <- which(names(six) == "visit_ID")
+count <- 0
+for (i in ind){
+  i <- i - count
+  if(i != (visit-count)){
+    six <- six[,-i]
+    count <- count + 1
+  }
+}
+#six <- short(six)
+hope <- merge(x = hope, y = six, by = "visit_ID", all.x=TRUE)
+na.test(hope)
+
+names(five)
+names(six)
+seven <- read.table(paste(path2, filelist[7], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+seven <- header.true(seven)
+names(seven)
+ind <- which(names(seven) %in% names(hope))
+visit <- which(names(seven) == "visit_ID")
+count <- 0
+for (i in ind){
+  i <- i - count
+  if(i != (visit-count)){
+    seven <- seven[,-i]
+    count <- count + 1
+  }
+}
+
+hope <- merge(x = hope, y = seven, by = "visit_ID", all.x = TRUE)
+na.test(hope)
+
+eight <- read.table(paste(path2, filelist[8], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+eight <- header.true(eight)
+again <- merge(x = hope, y = eight, all.x = TRUE)
+
+#Make more readable, condense for loops into functions and have one for loop run through all of the files
+
+```

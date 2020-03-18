@@ -24,10 +24,10 @@ Each sample is downloaded as a separate file, which needs to be further reshaped
 In terminal:
 
 * merge all into one file using concatenate function
-* Terminal Code: $cat *.stirrups.profile.txt > MOMS_PI_allstirrups_quotes.txt"$
+* Terminal Code: cat *.stirrups.profile.txt > MOMS_PI_allstirrups_quotes.txt"
 * get rid of quotes, which cause issues later in R
 * Note, you could use the -i flag to avoid another file, but this sometimes has issues on Macs
-* Terminal Code: $sed 's/\"//g' MOMS_PI_allstirrups_quotes.txt > MOMS_PI_allstirrups.txt"$
+* Terminal Code: sed 's/\"//g' MOMS_PI_allstirrups_quotes.txt > MOMS_PI_allstirrups.txt"
 
 ```{r, echo=TRUE, results='hide'}
 rm(list=ls())
@@ -46,7 +46,6 @@ This script is used to parse the text file produced from the bash code into an O
 This file is composed of 2055 samples of 360 taxa. This OTU matrix is then saved as an RDA file, which can be found on the github repository. 
 
 ```{r}
-#Add here
 MOMSPI_stirrups<- as.data.frame(fread(here("data","MOMS_PI_allstirrups.txt")),sep="\t",header=FALSE,quote="")
 colnames(MOMSPI_stirrups)<- c("Sample_Name","Taxon","Threshold_Status","No_Reads","Percent_Abundance","Average_Identity")
 #For normalizing to only to those that had a hit (AT only)
@@ -71,7 +70,6 @@ We will update this taxa table with all taxonomic information.
 
 
 ```{r}
-#
 fName <- colnames(momspi)
 both <- str_split_fixed(fName, "_", n = 2)
 Genus <- both[,1]
@@ -100,7 +98,6 @@ Instructions on how to download rda using HMP2Data package.
 
 ```{r}
 #load("HMP2Data/data/momspi16S_mtx.rda")
-#Add here
 load(here("data","momspi16S_samp.rda"))
 #load("HMP2Data/data/momspi16S_tax.rda")
 

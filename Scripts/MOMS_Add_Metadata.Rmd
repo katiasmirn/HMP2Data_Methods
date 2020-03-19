@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 
-mount -t smbfs  //'rams;eid'@rams.adp.vcu.edu/som/shares/Biostatistics/Projects/MOMS-PI ~/local_folder_path/MOMS-PI
+Terminal Command: mount -t smbfs  //'rams;eid'@rams.adp.vcu.edu/som/shares/Biostatistics/Projects/MOMS-PI ~/local_folder_path/MOMS-PI
 
 
 ```{r cars}
@@ -35,18 +35,25 @@ newmoms <- rownames(meta_sub)
 ```
 
 ```{r Functions}
+#Makes first row the column name and then deletes first row
+#Input: Dataframe
+#Output: Dataframe with one less row
 header.true <- function(df) {
   names(df) <- as.character(unlist(df[1,]))
   df[-1,]
 }
-
+#Tests if any column is all NA
+#Input: Dataframe
+#Output: Nothing if no NA, otherwise outputs columns that are NA
 na.test <-  function (x) {
   w <- sapply(x, function(x)all(is.na(x)))
   if (any(w)) {
     stop(paste("All NA in columns", paste(which(w), collapse=", ")))
   }
 }
-
+#Checks if df has any columns not in hope and updates to df to unique columns and a 'visit_ID' column
+#Input: 2 Dataframes
+#Output: Dataframe with unique columns
 short.df <- function(df, hope) {
   ind <- which(names(df) %in% names(hope))
   visit <- which(names(df) == "visit_ID")

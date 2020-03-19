@@ -25,19 +25,70 @@ library(here)
 
 You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
+```{r files, echo=FALSE}
 path2 <- "~/Documents/MOMS-PI/71694/PhenoGenotypeFiles/RootStudyConsentSet_phs001523.MOMS_PI.v1.p1.c1.DS-PREG-COM-IRB-PUB-MDS/PhenotypeFiles/"
 load(here("data","stirrups_OTU.rda"))
 load(here("data", "stirrups_samps.rda"))
 newmoms <- rownames(meta_sub)
 ```
 
-```{r }
+```{r Functions}
 header.true <- function(df) {
   names(df) <- as.character(unlist(df[1,]))
   df[-1,]
 }
+
+na.test <-  function (x) {
+  w <- sapply(x, function(x)all(is.na(x)))
+  if (any(w)) {
+    stop(paste("All NA in columns", paste(which(w), collapse=", ")))
+  }
+}
+
+short.df <- function(df, hope) {
+  ind <- which(names(df) %in% names(hope))
+  visit <- which(names(df) == "visit_ID")
+  count <- 0
+  for (i in ind){
+    i <- i - count
+    if(i != (visit-count)){
+      df <- df[,-i]
+      count <- count + 1
+    }
+  }
+  return(df)
+}
 ```
+
+```{r }
+# Include specific file names that you want here:
+# Add each file and merge to phyloseq object
+multi <- read.table(paste(path2, "phs001523.v1.pht007509.v1.p1.MOMS_PI_Sample.MULTI.txt", sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+multi <- header.true(multi)
+check <- meta_sub[newmoms %in% multi$SAMPLE_ID,]
+multi_cond <- multi[multi$SAMPLE_ID %in% newmoms,]
+visit_ID <- str_split_fixed(multi_cond$SAMPLE_ID, "_MV1D", n = 2)[,1]
+multi_cond["visit_ID"] <- c(visit_ID)
+
+clinical <- read.table(paste(path2, "phs001523.v1.pht007510.v1.p1.c1.phenotype_clinical.DS-PREG-COM-IRB-PUB-MDS.txt", sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+clinical <- header.true(clinical)
+names(clinical)
+clinical <- short.df(clinical, multi_cond)
+add_meta <- merge(x = multi_cond, y = clinical, all.x = TRUE)
+
+health_history <- read.table(paste(path2, "phs001523.v1.pht007512.v1.p1.c1.phenotype_healthHistorySurvey.DS-PREG-COM-IRB-PUB-MDS.txt", sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+health_history <- header.true(health_history)
+health_history <- short.df(health_history, add_meta)
+add_meta <- merge(x = add_meta, y = health_history, all.x = TRUE)
+
+na.test(add_meta)
+
+#Merge to phyloseq object:
+
+
+
+```
+
 
 ```{r }
 filelist = list.files(path = path2, pattern = ".*.txt$")
@@ -68,13 +119,6 @@ hope <- merge(hope,one)
 #  exa <- header.true(exa)
 #  hope <- merge(x = hope, y = exa, by = "visit_ID", all.x = TRUE)
 #}
-
-na.test <-  function (x) {
-  w <- sapply(x, function(x)all(is.na(x)))
-  if (any(w)) {
-    stop(paste("All NA in columns", paste(which(w), collapse=", ")))
-  }
-}
 
 na.test(hope)
 

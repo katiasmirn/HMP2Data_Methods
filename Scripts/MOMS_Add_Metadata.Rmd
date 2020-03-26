@@ -103,18 +103,11 @@ na.test(add_meta)
 
 #Merge to phyloseq object:
 add_samps <- sample_data(add_meta)
-<<<<<<< HEAD
+
 stirrups_phyloseq_updated <- merge_phyloseq(physeq, add_samps)
 #need to be saved to Biostats server
 saveRDS(stirrups_phyloseq_updated, file = file.path(path2, "MergedFiles", "stirrups_phyloseq_updated.RDS"))
-=======
-new_physeq <- merge_phyloseq(physeq, add_samps)
-<<<<<<< HEAD
-=======
-#need to be saved to Biostats server
->>>>>>> 600defea69c10f223ed6b8cc71fad6d3e6c905dc
-#saveRDS(new_physeq, file = "stirrups_phyloseq_updated.RDS")
->>>>>>> refs/remotes/origin/master
+
 ```
 
 
@@ -157,7 +150,7 @@ na.test(comp_meta) #Test if file has any columns with all NA values
 
 #Merge into phyloseq
 comp_samps <- sample_data(comp_meta)
-<<<<<<< HEAD
+
 stirrups_phyloseq_completed <- merge_phyloseq(physeq, comp_samps)
 
 #have to be saved to Biostats server
@@ -170,13 +163,6 @@ To access slots of the phyloseq objects, use the following
 OTU_table <- otu_table(stirrups_phyloseq_updated)
 Meta_data <- sample_data(stirrups_phyloseq_updated)
 taxa_table <- tax_table(stirrups_phyloseq_updated)
-=======
-comp_physeq <- merge_phyloseq(physeq, comp_samps)
-<<<<<<< HEAD
-=======
-#have to be saved to Biostats server
->>>>>>> 600defea69c10f223ed6b8cc71fad6d3e6c905dc
-#saveRDS(comp_physeq, file = "stirrups_phyloseq_completed.RDS")
->>>>>>> refs/remotes/origin/master
+
 ```
 

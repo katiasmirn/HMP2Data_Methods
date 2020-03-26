@@ -95,7 +95,7 @@ na.test(add_meta)
 #Merge to phyloseq object:
 add_samps <- sample_data(add_meta)
 new_physeq <- merge_phyloseq(physeq, add_samps)
-saveRDS(new_physeq, file = "stirrups_phyloseq_updated.RDS")
+#saveRDS(new_physeq, file = "stirrups_phyloseq_updated.RDS")
 ```
 
 
@@ -139,5 +139,5 @@ na.test(comp_meta) #Test if file has any columns with all NA values
 #Merge into phyloseq
 comp_samps <- sample_data(comp_meta)
 comp_physeq <- merge_phyloseq(physeq, comp_samps)
-saveRDS(comp_physeq, file = "stirrups_phyloseq_completed.RDS")
+#saveRDS(comp_physeq, file = "stirrups_phyloseq_completed.RDS")
 ```

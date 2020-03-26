@@ -1,5 +1,5 @@
 ---
-title: "MOMS_Add_Metadata"
+title: "Merging MOMS-PI dbGap Metadata"
 output: html_document
 ---
 
@@ -27,7 +27,14 @@ library(phyloseq)
 You can also embed plots, for example:
 
 ```{r files, echo=FALSE}
-path2 <- "~/Documents/MOMS-PI/71694/PhenoGenotypeFiles/RootStudyConsentSet_phs001523.MOMS_PI.v1.p1.c1.DS-PREG-COM-IRB-PUB-MDS/PhenotypeFiles/"
+
+#path to protected dbGap data location
+
+local_path <- "~/Documents/MOMS-PI"# change me
+local_path <- "~/MOMS-PI"# change me
+
+path2 <- file.path(local_path,"71694", "PhenoGenotypeFiles", "RootStudyConsentSet_phs001523.MOMS_PI.v1.p1.c1.DS-PREG-COM-IRB-PUB-MDS", "PhenotypeFiles") 
+
 load(here("data","stirrups_OTU.rda"))
 load(here("data", "stirrups_samps.rda"))
 physeq <- readRDS(here("data", "stirrups_phyloseq.RDS"))
@@ -72,20 +79,20 @@ short.df <- function(df, hope) {
 ```{r }
 # Include specific file names that you want here:
 # Add each file and merge to phyloseq object
-multi <- read.table(paste(path2, "phs001523.v1.pht007509.v1.p1.MOMS_PI_Sample.MULTI.txt", sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+multi <- read.table(file.path(path2, "phs001523.v1.pht007509.v1.p1.MOMS_PI_Sample.MULTI.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 multi <- header.true(multi)
 check <- meta_sub[newmoms %in% multi$SAMPLE_ID,]
 multi_cond <- multi[multi$SAMPLE_ID %in% newmoms,]
 visit_ID <- str_split_fixed(multi_cond$SAMPLE_ID, "_MV1D", n = 2)[,1]
 multi_cond["visit_ID"] <- c(visit_ID)
 
-clinical <- read.table(paste(path2, "phs001523.v1.pht007510.v1.p1.c1.phenotype_clinical.DS-PREG-COM-IRB-PUB-MDS.txt", sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+clinical <- read.table(file.path(path2, "phs001523.v1.pht007510.v1.p1.c1.phenotype_clinical.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 clinical <- header.true(clinical)
 names(clinical)
 clinical <- short.df(clinical, multi_cond)
 add_meta <- merge(x = multi_cond, y = clinical, all.x = TRUE)
 
-health_history <- read.table(paste(path2, "phs001523.v1.pht007512.v1.p1.c1.phenotype_healthHistorySurvey.DS-PREG-COM-IRB-PUB-MDS.txt", sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+health_history <- read.table(file.path(path2, "phs001523.v1.pht007512.v1.p1.c1.phenotype_healthHistorySurvey.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 health_history <- header.true(health_history)
 health_history <- short.df(health_history, add_meta)
 add_meta <- merge(x = add_meta, y = health_history, all.x = TRUE)
@@ -95,6 +102,10 @@ na.test(add_meta)
 #Merge to phyloseq object:
 add_samps <- sample_data(add_meta)
 new_physeq <- merge_phyloseq(physeq, add_samps)
+<<<<<<< HEAD
+=======
+#need to be saved to Biostats server
+>>>>>>> 600defea69c10f223ed6b8cc71fad6d3e6c905dc
 #saveRDS(new_physeq, file = "stirrups_phyloseq_updated.RDS")
 ```
 
@@ -102,7 +113,7 @@ new_physeq <- merge_phyloseq(physeq, add_samps)
 ```{r }
 filelist = list.files(path = path2, pattern = ".*.txt$")
 
-init <- read.table(paste(path2, filelist[9], sep=""), fill = TRUE, header = FALSE, sep = "", dec = ".")
+init <- read.table(file.path(path2, filelist[9]), fill = TRUE, header = FALSE, sep = "", dec = ".")
 init <- header.true(init)
 names(init)
 
@@ -111,7 +122,7 @@ check <- meta_sub[newmoms %in% init$SAMPLE_ID,] #2055 obs x 13 variables (so all
 samps <- init[init$SAMPLE_ID %in% newmoms,] #Create initial matrix for 2055 samples
 
 #Read in second file
-second <- read.table(paste(path2, filelist[2], sep=""), fill = TRUE, header = FALSE, sep = "", dec = ".")
+second <- read.table(file.path(path2, filelist[2]), fill = TRUE, header = FALSE, sep = "", dec = ".")
 second <- header.true(second)
 #Merge initial file and second file
 comp_meta <- merge(samps, second)
@@ -119,19 +130,19 @@ comp_meta <- merge(samps, second)
 visit_ID <- str_split_fixed(comp_meta$SAMPLE_ID, "_MV1D", n = 2)[,1]
 comp_meta["visit_ID"] <- c(visit_ID)
 #Read in first file
-one <- read.table(paste(path2, filelist[1], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+one <- read.table(file.path(path2, filelist[1]), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 one <- header.true(one)
 #Merge updated file and first file
 comp_meta <- merge(comp_meta,one)
 #For loop that goes through remaining file, besides last file, and merges the files based on the visit ID
 for (i in 3:7) {
-  file <- read.table(paste(path2, filelist[i], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+  file <- read.table(file.path(path2, filelist[i]), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
   file <- header.true(file)
   file <- short.df(file, comp_meta) #Function to shorten file to just meaningful/unseen columns
   comp_meta <- merge(x = comp_meta, y = file, by = "visit_ID", all.x = TRUE)
 }
 #Merge last file
-eight <- read.table(paste(path2, filelist[8], sep=""), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+eight <- read.table(file.path(path2, filelist[8]), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 eight <- header.true(eight)
 comp_meta <- merge(x = comp_meta, y = eight, all.x = TRUE)
 na.test(comp_meta) #Test if file has any columns with all NA values
@@ -139,5 +150,9 @@ na.test(comp_meta) #Test if file has any columns with all NA values
 #Merge into phyloseq
 comp_samps <- sample_data(comp_meta)
 comp_physeq <- merge_phyloseq(physeq, comp_samps)
+<<<<<<< HEAD
+=======
+#have to be saved to Biostats server
+>>>>>>> 600defea69c10f223ed6b8cc71fad6d3e6c905dc
 #saveRDS(comp_physeq, file = "stirrups_phyloseq_completed.RDS")
 ```

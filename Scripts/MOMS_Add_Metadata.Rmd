@@ -20,6 +20,7 @@ library(dplyr)
 library(stringr)
 library(here)
 library(phyloseq)
+library(HMP2Data) #install the library from github
 ```
 
 ## Including Plots
@@ -82,9 +83,10 @@ On your secure server, create folder  MergedFiles inside phenotype data folder (
 # Include specific file names that you want here:
 # Add each file and merge to phyloseq object
 multi <- read.table(file.path(path2, "phs001523.v1.pht007509.v1.p1.MOMS_PI_Sample.MULTI.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
-multi <- header.true(multi)
+#check how many apper in the data
+multi <- header.true(multi)#takes first row and makes it into colum names #how many not in file
 check <- meta_sub[newmoms %in% multi$SAMPLE_ID,]
-multi_cond <- multi[multi$SAMPLE_ID %in% newmoms,]
+multi_cond <- multi[multi$SAMPLE_ID %in% newmoms,] #subset to samples with dbGap
 visit_ID <- str_split_fixed(multi_cond$SAMPLE_ID, "_MV1D", n = 2)[,1]
 multi_cond["visit_ID"] <- c(visit_ID)
 
@@ -104,6 +106,12 @@ na.test(add_meta)
 #Merge to phyloseq object:
 add_samps <- sample_data(add_meta)
 
+#take the momspi16S_stirrups_samp from HMP2Data package
+#TO DO make parts to construct phyloseq stirrups, 
+#make sure take only the samples that are in the physeq stirrups
+add_meta <- add_meta[order(add_meta$dbGaP_Subject_ID, add_meta$visit_num),]
+
+#construct the phyloseq 
 stirrups_phyloseq_updated <- merge_phyloseq(physeq, add_samps)
 #need to be saved to Biostats server
 saveRDS(stirrups_phyloseq_updated, file = file.path(path2, "MergedFiles", "stirrups_phyloseq_updated.RDS"))

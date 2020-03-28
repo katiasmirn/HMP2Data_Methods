@@ -82,27 +82,41 @@ On your secure server, create folder  MergedFiles inside phenotype data folder (
 ```{r }
 # Include specific file names that you want here:
 # Add each file and merge to phyloseq object
-multi <- read.table(file.path(path2, "phs001523.v1.pht007509.v1.p1.MOMS_PI_Sample.MULTI.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
-#check how many apper in the data
-multi <- header.true(multi)#takes first row and makes it into colum names #how many not in file
-check <- meta_sub[newmoms %in% multi$SAMPLE_ID,]
-multi_cond <- multi[multi$SAMPLE_ID %in% newmoms,] #subset to samples with dbGap
-visit_ID <- str_split_fixed(multi_cond$SAMPLE_ID, "_MV1D", n = 2)[,1]
-multi_cond["visit_ID"] <- c(visit_ID)
-
 clinical <- read.table(file.path(path2, "phs001523.v1.pht007510.v1.p1.c1.phenotype_clinical.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 clinical <- header.true(clinical)
 names(clinical)
-clinical <- short.df(clinical, multi_cond)
-add_meta <- merge(x = multi_cond, y = clinical, all.x = TRUE)
+#clinical <- short.df(clinical, multi_cond)
+#add_meta <- merge(x = multi_cond, y = clinical, all.x = TRUE)
+
+
+
+
+#check <- meta_sub[newmoms %in% multi$SAMPLE_ID,]
+#multi_cond <- multi[multi$SAMPLE_ID %in% newmoms,] #subset to samples with dbGap
+#visit_ID <- str_split_fixed(multi_cond$SAMPLE_ID, "_MV1D", n = 2)[,1]
+#multi_cond["visit_ID"] <- c(visit_ID)
+
+
 
 health_history <- read.table(file.path(path2, "phs001523.v1.pht007512.v1.p1.c1.phenotype_healthHistorySurvey.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 health_history <- header.true(health_history)
-health_history <- short.df(health_history, add_meta)
-add_meta <- merge(x = add_meta, y = health_history, all.x = TRUE)
+health_history <- health_history[,-(which(names(health_history) == "visit_num"))]
+health_history <- health_history[,-(which(names(health_history) == "visit_ID"))]
+#health_history <- short.df(health_history, add_meta)
+add_meta <- merge(x = clinical, y = health_history)
 
 na.test(add_meta)
 
+revofsys <- read.table(file.path(path2, "phs001523.v1.pht007511.v1.p1.c1.phenotype_reviewOfSystemsSurvey.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+revofsys <- header.true(revofsys)
+add_meta <- merge(x= add_meta, y = revofsys)
+
+multi <- read.table(file.path(path2, "phs001523.v1.pht007509.v1.p1.MOMS_PI_Sample.MULTI.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
+#check how many apper in the data
+multi <- header.true(multi)#takes first row and makes it into colum names #how many not in file
+visit_id <- str_match(multi$SAMPLE_ID, "(.*_.*)_.*")[,2]
+multi["visit_ID"] <- c(visit_id)
+newmer <- merge(x = clinical, y = multi)
 #Merge to phyloseq object:
 add_samps <- sample_data(add_meta)
 

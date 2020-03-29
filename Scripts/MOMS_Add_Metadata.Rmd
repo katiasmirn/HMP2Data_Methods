@@ -119,14 +119,30 @@ multi <- header.true(multi)#takes first row and makes it into colum names #how m
 visit_id <- str_match(multi$SAMPLE_ID, "(.*_.*)_.*")[,2]
 multi["visit_ID"] <- c(visit_id)
 newmer <- merge(x = new_meta, y = multi, all = TRUE)
+
+check <- meta_sub[newmoms %in% newmer$SAMPLE_ID,]
+new_meta <- merge(x = meta_sub, y = newmer, by.x = 0, by.y = "SAMPLE_ID")
+na.test(new_meta)
+
+#In health history, some samples are labeled twice but have two different inputs. For instance, EP081373 has two different entries with one saying 
+#the subject is African American and the other one saying they are not.
+
+discr = c("EP081373", "EP422409","EP936022", "EP989401")
+discrepancies <- health_history[which(health_history$SUBJECT_ID %in% discr),]
+write.csv(discrepancies, file = file.path(path2, "MergedFiles", "Discrepancies.csv"))
+
+new_data <- new_meta %>% distinct(Row.names, .keep_all = TRUE) #keeps only the first unique row name, done so that it can merge correctly with phyloseq 
+#object
+
 #Merge to phyloseq object:
-add_samps <- sample_data(add_meta)
+new_samps <- sample_data(new_data)
 
 #take the momspi16S_stirrups_samp from HMP2Data package
 #TO DO make parts to construct phyloseq stirrups, 
 #make sure take only the samples that are in the physeq stirrups
-add_meta <- add_meta[order(add_meta$dbGaP_Subject_ID, add_meta$visit_num),]
-
+new_data <- new_data[order(new_data$dbGaP_Subject_ID, new_data$visit_num),]
+rownames(new_data) <- new_data$Row.names
+new_data$Row.names <- NULL 
 #construct the phyloseq 
 stirrups_phyloseq_updated <- merge_phyloseq(physeq, add_samps)
 #need to be saved to Biostats server

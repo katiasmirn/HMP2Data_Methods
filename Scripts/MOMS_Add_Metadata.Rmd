@@ -87,7 +87,7 @@ clinical <- header.true(clinical)
 names(clinical)
 #clinical <- short.df(clinical, multi_cond)
 #add_meta <- merge(x = multi_cond, y = clinical, all.x = TRUE)
-
+#visits <- str_split_fixed(newmoms, "_MV1D", n = 2)[,1]
 
 
 
@@ -103,20 +103,22 @@ health_history <- header.true(health_history)
 health_history <- health_history[,-(which(names(health_history) == "visit_num"))]
 health_history <- health_history[,-(which(names(health_history) == "visit_ID"))]
 #health_history <- short.df(health_history, add_meta)
-add_meta <- merge(x = clinical, y = health_history)
+add_meta <- merge(x = clinical, y = health_history, all.x = TRUE)
 
 na.test(add_meta)
 
 revofsys <- read.table(file.path(path2, "phs001523.v1.pht007511.v1.p1.c1.phenotype_reviewOfSystemsSurvey.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 revofsys <- header.true(revofsys)
-add_meta <- merge(x= add_meta, y = revofsys)
+revofsys <- short.df(revofsys, add_meta)
+new_meta <- merge(x = add_meta, y = revofsys, all.x = TRUE)
+na.test(new_meta)
 
 multi <- read.table(file.path(path2, "phs001523.v1.pht007509.v1.p1.MOMS_PI_Sample.MULTI.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
 #check how many apper in the data
 multi <- header.true(multi)#takes first row and makes it into colum names #how many not in file
 visit_id <- str_match(multi$SAMPLE_ID, "(.*_.*)_.*")[,2]
 multi["visit_ID"] <- c(visit_id)
-newmer <- merge(x = clinical, y = multi)
+newmer <- merge(x = new_meta, y = multi, all = TRUE)
 #Merge to phyloseq object:
 add_samps <- sample_data(add_meta)
 

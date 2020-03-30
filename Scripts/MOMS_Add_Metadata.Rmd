@@ -90,11 +90,16 @@ names(clinical)
 
 #Read in health history file
 health_history <- read.table(file.path(path2, "phs001523.v1.pht007512.v1.p1.c1.phenotype_healthHistorySurvey.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
-health_history <- header.true(health_history)#takes first row and makes it into colum names 
-health_history <- health_history[,-(which(names(health_history) == "visit_num"))] #Column not needed
-health_history <- health_history[,-(which(names(health_history) == "visit_ID"))] #Column not needed
+health_history <- header.true(health_history)#takes first row and makes it into colum names
+#rename to have identifier for baseline health history collection visit
+#rename(new variable name = existing variable name)
+health_history <- health_history %>% rename("visit_num_health_survey" = "visit_num") 
+#remove visit id at baseline to have history information appear for each visit
+health_history <- health_history[,-(which(names(health_history) == "visit_ID"))] 
 add_meta <- merge(x = clinical, y = health_history, all.x = TRUE)
+#add_meta <- add_meta[order(add_meta$dbGaP_Subject_ID, add_meta$SUBJECT_ID, add_meta$visit_num),]
 
+  
 #In health history, some samples are labeled twice but have two different inputs. For instance, EP081373 has two different entries with one saying 
 #the subject is African American and the other one saying they are not.
 
@@ -196,9 +201,11 @@ saveRDS(stirrups_phyloseq_completed, file = file.path(path2, "MergedFiles", "sti
 To access slots of the phyloseq objects, use the following
 
 ```{r}
-OTU_table <- otu_table(stirrups_phyloseq_updated)
-Meta_data <- sample_data(stirrups_phyloseq_updated)
-taxa_table <- tax_table(stirrups_phyloseq_updated)
+OTU_table <- as(otu_table(stirrups_phyloseq_updated), "matrix") 
+Meta_data <- as(sample_data(stirrups_phyloseq_updated), "data.frame")
+taxa_table <- as(tax_table(stirrups_phyloseq_updated), "matrix")
 
+write.csv(OTU_table, file = file.path(path2, "MergedFiles", "OTU_table.csv"))
+write.csv(Meta_data, file = file.path(path2, "MergedFiles", "Meta_data.csv"))
 ```
 

@@ -95,6 +95,13 @@ health_history <- health_history[,-(which(names(health_history) == "visit_num"))
 health_history <- health_history[,-(which(names(health_history) == "visit_ID"))] #Column not needed
 add_meta <- merge(x = clinical, y = health_history, all.x = TRUE)
 
+#In health history, some samples are labeled twice but have two different inputs. For instance, EP081373 has two different entries with one saying 
+#the subject is African American and the other one saying they are not.
+
+discr = c("EP081373", "EP422409","EP936022", "EP989401")
+discrepancies <- health_history[which(health_history$SUBJECT_ID %in% discr),]
+write.csv(discrepancies, file = file.path(path2, "MergedFiles", "Discrepancies.csv"))
+
 na.test(add_meta) #Test if any column is all NA
 
 #Read in review of systems file
@@ -116,18 +123,13 @@ length(which(!newmer$SAMPLE_ID %in% newmoms)) #8585 samples not in meta_sub file
 new_meta <- merge(x = meta_sub, y = newmer, by.x = 0, by.y = "SAMPLE_ID")
 na.test(new_meta)
 
-#In health history, some samples are labeled twice but have two different inputs. For instance, EP081373 has two different entries with one saying 
-#the subject is African American and the other one saying they are not.
 
-discr = c("EP081373", "EP422409","EP936022", "EP989401")
-discrepancies <- health_history[which(health_history$SUBJECT_ID %in% discr),]
-write.csv(discrepancies, file = file.path(path2, "MergedFiles", "Discrepancies.csv"))
-
-new_data <- new_meta %>% distinct(Row.names, .keep_all = TRUE) #keeps only the first unique row name, done so that it can merge correctly with phyloseq 
-#object
+#Clean up data
+new_data <- new_meta %>% distinct(Row.names, .keep_all = TRUE) #keeps only the first unique row name, done so that it can merge correctly with phyloseq object
 new_data <- new_data[order(new_data$dbGaP_Subject_ID, new_data$visit_num),]
 rownames(new_data) <- new_data$Row.names
 new_data$Row.names <- NULL 
+
 #Merge to phyloseq object:
 new_samps <- sample_data(new_data)
 

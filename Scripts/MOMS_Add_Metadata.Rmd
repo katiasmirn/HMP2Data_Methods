@@ -82,45 +82,37 @@ On your secure server, create folder  MergedFiles inside phenotype data folder (
 ```{r }
 # Include specific file names that you want here:
 # Add each file and merge to phyloseq object
+
+#Read in clinical data file
 clinical <- read.table(file.path(path2, "phs001523.v1.pht007510.v1.p1.c1.phenotype_clinical.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
-clinical <- header.true(clinical)
+clinical <- header.true(clinical)#takes first row and makes it into colum names 
 names(clinical)
-#clinical <- short.df(clinical, multi_cond)
-#add_meta <- merge(x = multi_cond, y = clinical, all.x = TRUE)
-#visits <- str_split_fixed(newmoms, "_MV1D", n = 2)[,1]
 
-
-
-#check <- meta_sub[newmoms %in% multi$SAMPLE_ID,]
-#multi_cond <- multi[multi$SAMPLE_ID %in% newmoms,] #subset to samples with dbGap
-#visit_ID <- str_split_fixed(multi_cond$SAMPLE_ID, "_MV1D", n = 2)[,1]
-#multi_cond["visit_ID"] <- c(visit_ID)
-
-
-
+#Read in health history file
 health_history <- read.table(file.path(path2, "phs001523.v1.pht007512.v1.p1.c1.phenotype_healthHistorySurvey.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
-health_history <- header.true(health_history)
-health_history <- health_history[,-(which(names(health_history) == "visit_num"))]
-health_history <- health_history[,-(which(names(health_history) == "visit_ID"))]
-#health_history <- short.df(health_history, add_meta)
+health_history <- header.true(health_history)#takes first row and makes it into colum names 
+health_history <- health_history[,-(which(names(health_history) == "visit_num"))] #Column not needed
+health_history <- health_history[,-(which(names(health_history) == "visit_ID"))] #Column not needed
 add_meta <- merge(x = clinical, y = health_history, all.x = TRUE)
 
-na.test(add_meta)
+na.test(add_meta) #Test if any column is all NA
 
+#Read in review of systems file
 revofsys <- read.table(file.path(path2, "phs001523.v1.pht007511.v1.p1.c1.phenotype_reviewOfSystemsSurvey.DS-PREG-COM-IRB-PUB-MDS.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
-revofsys <- header.true(revofsys)
+revofsys <- header.true(revofsys)#takes first row and makes it into colum names 
 revofsys <- short.df(revofsys, add_meta)
 new_meta <- merge(x = add_meta, y = revofsys, all.x = TRUE)
 na.test(new_meta)
 
+#Read in sample descriptions file
 multi <- read.table(file.path(path2, "phs001523.v1.pht007509.v1.p1.MOMS_PI_Sample.MULTI.txt"), fill = TRUE, header = FALSE, sep = "\t", dec = ".")
-#check how many apper in the data
-multi <- header.true(multi)#takes first row and makes it into colum names #how many not in file
+multi <- header.true(multi)#takes first row and makes it into colum names 
 visit_id <- str_match(multi$SAMPLE_ID, "(.*_.*)_.*")[,2]
 multi["visit_ID"] <- c(visit_id)
-newmer <- merge(x = new_meta, y = multi, all = TRUE)
+newmer <- merge(x = new_meta, y = multi, all = TRUE) 
+length(which(!newmer$SAMPLE_ID %in% newmoms)) #8585 samples not in meta_sub file
 
-check <- meta_sub[newmoms %in% newmer$SAMPLE_ID,]
+#Merge to publicly available sample metadata
 new_meta <- merge(x = meta_sub, y = newmer, by.x = 0, by.y = "SAMPLE_ID")
 na.test(new_meta)
 
@@ -133,16 +125,17 @@ write.csv(discrepancies, file = file.path(path2, "MergedFiles", "Discrepancies.c
 
 new_data <- new_meta %>% distinct(Row.names, .keep_all = TRUE) #keeps only the first unique row name, done so that it can merge correctly with phyloseq 
 #object
-
+new_data <- new_data[order(new_data$dbGaP_Subject_ID, new_data$visit_num),]
+rownames(new_data) <- new_data$Row.names
+new_data$Row.names <- NULL 
 #Merge to phyloseq object:
 new_samps <- sample_data(new_data)
 
 #take the momspi16S_stirrups_samp from HMP2Data package
 #TO DO make parts to construct phyloseq stirrups, 
 #make sure take only the samples that are in the physeq stirrups
-new_data <- new_data[order(new_data$dbGaP_Subject_ID, new_data$visit_num),]
-rownames(new_data) <- new_data$Row.names
-new_data$Row.names <- NULL 
+
+
 #construct the phyloseq 
 stirrups_phyloseq_updated <- merge_phyloseq(physeq, add_samps)
 #need to be saved to Biostats server

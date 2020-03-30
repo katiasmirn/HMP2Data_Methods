@@ -207,5 +207,10 @@ taxa_table <- as(tax_table(stirrups_phyloseq_updated), "matrix")
 
 write.csv(OTU_table, file = file.path(path2, "MergedFiles", "OTU_table.csv"))
 write.csv(Meta_data, file = file.path(path2, "MergedFiles", "Meta_data.csv"))
+
+
+Meta_data_physeq <- as(sample_data(physeq), "data.frame")
+write.csv(Meta_data_physeq, file = file.path(path2, "MergedFiles", "Meta_data_physeq.csv"))
+physeq
 ```
 

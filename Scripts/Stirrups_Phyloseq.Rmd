@@ -46,6 +46,16 @@ This script is used to parse the text file produced from the bash code into an O
 This file is composed of 2055 samples of 360 taxa. This OTU matrix is then saved as an RDA file, which can be found on the github repository. 
 
 ```{r}
+#Tests if any column is all NA
+#Input: Dataframe
+#Output: Nothing if no NA, otherwise outputs columns that are NA
+na.test <-  function (x) {
+  w <- sapply(x, function(x)all(is.na(x)))
+  if (any(w)) {
+    stop(paste("All NA in columns", paste(which(w), collapse=", ")))
+  }
+}
+
 MOMSPI_stirrups<- as.data.frame(fread(here("data","MOMS_PI_allstirrups.txt")),sep="\t",header=FALSE,quote="")
 colnames(MOMSPI_stirrups)<- c("Sample_Name","Taxon","Threshold_Status","No_Reads","Percent_Abundance","Average_Identity")
 #For normalizing to only to those that had a hit (AT only)
@@ -58,6 +68,7 @@ MOMSPI_stirrups_ATonly_forwide$Average_Identity<-NULL
 momspi <- as.data.frame(spread(MOMSPI_stirrups_ATonly_forwide,key = Taxon, value = No_Reads))
 rownames(momspi) <- momspi[,1]
 momspi[,1] <- NULL
+momspi[is.na(momspi)] <- 0
 save(momspi, file = "stirrups_OTU.rda")
 ```
 

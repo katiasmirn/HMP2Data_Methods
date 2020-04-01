@@ -146,7 +146,7 @@ new_samps <- sample_data(new_data)
 #construct the phyloseq 
 stirrups_phyloseq_updated <- merge_phyloseq(physeq, new_samps)
 #need to be saved to Biostats server
-saveRDS(stirrups_phyloseq_updated, file = file.path(path2, "MergedFiles", "stirrups_phyloseq_updated.RDS"))
+#saveRDS(stirrups_phyloseq_updated, file = file.path(path2, "MergedFiles", "stirrups_phyloseq_updated.RDS"))
 
 ```
 

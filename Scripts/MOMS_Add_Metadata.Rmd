@@ -141,6 +141,9 @@ stirrups_phyloseq_updated <- merge_phyloseq(physeq, new_samps)
 #need to be saved to Biostats server
 saveRDS(stirrups_phyloseq_updated, file = file.path(path2, "MergedFiles", "stirrups_phyloseq_updated.RDS"))
 
+
+#Rows missing phenotypic information: 
+rownames(new_data[is.na(new_data$african_american) & is.na(new_data$birthcontrol),]) #36 samples missing phenotypic information, 16 subjects in total
 ```
 
 

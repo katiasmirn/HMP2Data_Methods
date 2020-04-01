@@ -100,12 +100,10 @@ add_meta <- merge(x = clinical, y = health_history, all.x = TRUE)
 #add_meta <- add_meta[order(add_meta$dbGaP_Subject_ID, add_meta$SUBJECT_ID, add_meta$visit_num),]
 
   
-#In health history, some samples are labeled twice but have two different inputs. For instance, EP081373 has two different entries with one saying 
-#the subject is African American and the other one saying they are not.
-
+#In health history, some samples are labeled twice but have two different inputs. For instance, EP081373 has two different entries with one saying the subject is African American and the other one saying they are not.
 discr = c("EP081373", "EP422409","EP936022", "EP989401")
 discrepancies <- health_history[which(health_history$SUBJECT_ID %in% discr),]
-write.csv(discrepancies, file = file.path(path2, "MergedFiles", "Discrepancies.csv"))
+#write.csv(discrepancies, file = file.path(path2, "MergedFiles", "Discrepancies.csv"))
 
 na.test(add_meta) #Test if any column is all NA
 
@@ -138,15 +136,10 @@ new_data$Row.names <- NULL
 #Merge to phyloseq object:
 new_samps <- sample_data(new_data)
 
-#take the momspi16S_stirrups_samp from HMP2Data package
-#TO DO make parts to construct phyloseq stirrups, 
-#make sure take only the samples that are in the physeq stirrups
-
-
 #construct the phyloseq 
 stirrups_phyloseq_updated <- merge_phyloseq(physeq, new_samps)
 #need to be saved to Biostats server
-#saveRDS(stirrups_phyloseq_updated, file = file.path(path2, "MergedFiles", "stirrups_phyloseq_updated.RDS"))
+saveRDS(stirrups_phyloseq_updated, file = file.path(path2, "MergedFiles", "stirrups_phyloseq_updated.RDS"))
 
 ```
 

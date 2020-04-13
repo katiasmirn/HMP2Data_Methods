@@ -8,7 +8,70 @@ This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
 
 ```{r}
-plot(cars)
+rm(list=ls())
+require(ggplot2)
+#install.packages("pscl")
+#install.packages(glmmTMB)
+require(glmmTMB)
+require(pscl)
+require(boot)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(here)
+library(phyloseq)
+library(vegan)
+library(refund)
+library(reshape2)
+#library(HMP2Data) #install the library from github
+```
+
+
+```{r}
+#path to protected dbGap data location
+
+local_path <- "~/Documents/MOMS-PI"# change me
+#local_path <- "~/MOMS-PI"# change me
+
+path2 <- file.path(local_path,"71694", "PhenoGenotypeFiles", "RootStudyConsentSet_phs001523.MOMS_PI.v1.p1.c1.DS-PREG-COM-IRB-PUB-MDS", "PhenotypeFiles") 
+
+otu <- read.csv(file = file.path(path2, "MergedFiles", "OTU_table.csv"))
+rownames(otu) <- otu$X
+otu$X <- NULL 
+t_otu <- as.data.frame(t(otu))
+meta <- read.csv(file = file.path(path2, "MergedFiles", "Meta_data.csv"))
+rownames(meta) <- meta$X
+meta$X <- NULL
+full_set <- cbind(t_otu, meta)
+full_set$alpha_div <- diversity(full_set[,1:length(names(t_otu))], index="shannon")
+```
+
+```{r}
+#racial breakdown, break down visits and other demographics
+
+hist(full_set$Lactobacillus_iners)
+#Zero-Inflated Poisson Model
+z <- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + (1|SUBJECT_ID), data = full_set, family = poisson, zi = ~ vaginal_pH + reported_ga + alpha_div)
+summary(z)
+hist(predict(z))
+#summary(m1 <- zeroinfl(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div |SUBJECT_ID, data = full_set))
+
+
+
+#Zero-Inflated Negative Binomial Model
+neg_bin<- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + (1|SUBJECT_ID), data = full_set, family = nbinom2, zi = ~ vaginal_pH + reported_ga + alpha_div)
+summary(neg_bin)
+
+
+#Mixed Linear Regression Model
+mixedL <- lmer(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + african_american + asian + ... + (1|SUBJECT_ID), data = full_set)
+summary(mixedL)
+linpred <- predict(mixedL)
+#predicted
+#x-axis people
+#y-axis visits for that person
+plot(full_set$Lactobacillus_iners, linpred)
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.

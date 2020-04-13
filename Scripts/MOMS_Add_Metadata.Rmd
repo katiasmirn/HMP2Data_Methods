@@ -133,6 +133,20 @@ new_data <- new_data[order(new_data$dbGaP_Subject_ID, new_data$visit_num),]
 rownames(new_data) <- new_data$Row.names
 new_data$Row.names <- NULL 
 
+#race variable
+race <- new_data[,28:33]
+for (i in colnames(race)){
+  race[[i]] <- revalue(race[[i]], c("Yes"=1))
+  race[[i]] <- revalue(race[[i]], c("No"=0))
+}
+race[] <- lapply(race, function(x) {
+    if(is.factor(x)) as.numeric(as.character(x)) else x
+})
+race$sum <- rowSums(race, na.rm = TRUE)
+race$race <- max.col(race[1:6])
+race$race[which(race$sum == 0)] <- NA
+race$race <- mapvalues(race$race, from = c(1:6), to = names(race[1:6]))
+
 #Merge to phyloseq object:
 new_samps <- sample_data(new_data)
 

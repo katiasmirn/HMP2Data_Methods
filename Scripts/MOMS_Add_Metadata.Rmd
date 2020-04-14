@@ -16,11 +16,12 @@ Terminal Command: mount -t smbfs  //'rams;eid'@rams.adp.vcu.edu/som/shares/Biost
 rm(list=ls())
 library(data.table)
 library(tidyr)
+#library(plyr)
 library(dplyr)
 library(stringr)
 library(here)
 library(phyloseq)
-library(HMP2Data) #install the library from github
+#library(HMP2Data) #install the library from github
 ```
 
 ## Including Plots
@@ -32,7 +33,7 @@ You can also embed plots, for example:
 #path to protected dbGap data location
 
 local_path <- "~/Documents/MOMS-PI"# change me
-local_path <- "~/MOMS-PI"# change me
+#local_path <- "~/MOMS-PI"# change me
 
 path2 <- file.path(local_path,"71694", "PhenoGenotypeFiles", "RootStudyConsentSet_phs001523.MOMS_PI.v1.p1.c1.DS-PREG-COM-IRB-PUB-MDS", "PhenotypeFiles") 
 
@@ -136,8 +137,7 @@ new_data$Row.names <- NULL
 #race variable
 race <- new_data[,28:33]
 for (i in colnames(race)){
-  race[[i]] <- revalue(race[[i]], c("Yes"=1))
-  race[[i]] <- revalue(race[[i]], c("No"=0))
+  race[[i]] <- recode(race[[i]], "Yes"= 1, "No"= 0)
 }
 race[] <- lapply(race, function(x) {
     if(is.factor(x)) as.numeric(as.character(x)) else x
@@ -145,8 +145,8 @@ race[] <- lapply(race, function(x) {
 race$sum <- rowSums(race, na.rm = TRUE)
 race$race <- max.col(race[1:6])
 race$race[which(race$sum == 0)] <- NA
-race$race <- mapvalues(race$race, from = c(1:6), to = names(race[1:6]))
-
+race$race <- plyr::mapvalues(race$race, from = c(1:6), to = names(race[1:6]))
+new_data$race <- race$race
 #Merge to phyloseq object:
 new_samps <- sample_data(new_data)
 

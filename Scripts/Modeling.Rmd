@@ -24,6 +24,7 @@ library(phyloseq)
 library(vegan)
 library(refund)
 library(reshape2)
+library(kableExtra)
 #library(HMP2Data) #install the library from github
 ```
 
@@ -45,11 +46,52 @@ rownames(meta) <- meta$X
 meta$X <- NULL
 full_set <- cbind(t_otu, meta)
 full_set$alpha_div <- diversity(full_set[,1:length(names(t_otu))], index="shannon")
+full_set$num_reads <- rowSums(t_otu)
+full_set$p_Iners <- full_set$Lactobacillus_iners/full_set$num_reads
 ```
 
 ```{r}
-#racial breakdown, break down visits and other demographics
+#582 subjects
+#aggregate at patient level
+demog <- aggregate(visit_number ~ SUBJECT_ID, data = meta%>%data.frame, FUN = min)
+demog <- merge(demog,meta%>%data.frame, by = c("SUBJECT_ID", "visit_number") )
+  
+#number visits per subject 
+df <- aggregate(visit_number ~ SUBJECT_ID, data = meta%>%data.frame, FUN = length)
+colnames(df)[which(colnames(df) == "visit_number")] <- "number of visits"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
 
+#average vaginal_ph across visits
+#Some patients have na so goes to 568
+df <- aggregate(vaginal_pH ~ SUBJECT_ID, data = meta%>%data.frame, FUN = mean)
+colnames(df)[which(colnames(df) == "vaginal_pH")] <- "mean_vaginal_ph"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+Varnames <- c("vaginal_pH", "number of visits", "reported_ga", "gestational age (days)", 
+              "time between visits", "gestational age at delivery", "vaginal ph",
+            "BMI", "birth weight (kg)", "vaginal delivery")
+#racial breakdown, break down visits and other demographics
+stratified1 = tableone::CreateTableOne(
+  vars = Varnames[1:3],
+  data = summarytools::unlabel(demog), strata = "race", includeNA = TRUE)
+stratified1 <- print(stratified1, printToggle = FALSE, showAllLevels = FALSE)
+stratified1 = stratified1[,!(colnames(stratified1) %in% "test")]%>%
+  knitr::kable(format="latex")%>% 
+  kable_styling("striped", full_width = F, font_size = 9)
+stratified1
+
+```
+
+```{r}
+aggregate(Lactobacillus_iners ~ race+reported_ga, full_set, mean)
+#Look at iners over visits
+aggregate(p_Iners ~ race+reported_ga, full_set, mean)
+
+```
+
+
+
+```{r CountData}
 hist(full_set$Lactobacillus_iners)
 #Zero-Inflated Poisson Model
 z <- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + (1|SUBJECT_ID), data = full_set, family = poisson, zi = ~ vaginal_pH + reported_ga + alpha_div)
@@ -60,19 +102,60 @@ hist(predict(z))
 
 
 #Zero-Inflated Negative Binomial Model
-neg_bin<- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + (1|SUBJECT_ID), data = full_set, family = nbinom2, zi = ~ vaginal_pH + reported_ga + alpha_div)
+neg_bin<- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + offset(log(num_reads)) + (1|SUBJECT_ID), data = full_set, family = nbinom2, zi = ~ vaginal_pH + reported_ga + alpha_div)
 summary(neg_bin)
+predict(neg_bin)
+neg_binone <- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + offset(log(num_reads)) + (1|SUBJECT_ID), data = full_set, family = nbinom2, zi = ~ 1)
+summary(neg_binone)
+hist(predict(neg_binone))
+#Zero-Inflated Beta-Binomial Model
+#kostic.y <- cbind(1, kostic.y=="Tumor")
+beta_bin<- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set, family=betabinomial(link = "logit"), zi = ~ vaginal_pH + reported_ga + alpha_div + race)
 
 
 #Mixed Linear Regression Model
-mixedL <- lmer(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + african_american + asian + ... + (1|SUBJECT_ID), data = full_set)
+mixedL <- lmer(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set)
 summary(mixedL)
 linpred <- predict(mixedL)
 #predicted
 #x-axis people
 #y-axis visits for that person
-plot(full_set$Lactobacillus_iners, linpred)
+plot(full_set$Lactobacillus_iners[which(names(linpred) %in% rownames(full_set))], linpred)
+
+
+## Beta bimonial zero inflated ##
+
+## NBZIMM ##
+f21 = glmm.zinb(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div , random = ~ 1|SUBJECT_ID, data = full_set)
+summary(f21)
+summary(f21)$tTable[4, 5]
+
 ```
+
+```{r ProportionsData}
+hist(full_set$p_Iners)
+beta_bin<- glmmTMB(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set, family=betabinomial(link = "logit"), zi = ~ vaginal_pH + reported_ga + alpha_div + race)
+mean(full_set$p_Iners)
+var(full_set$p_Iners)
+
+library(zoib)
+#zoib
+#zoib(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race | 1|1, data = full_set, random = 1, EUID = full_set$SUBJECT_ID)
+
+
+
+
+zoib(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race | 1, data = full_set)
+
+
+mixedL <- lmer(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set)
+linpred <- predict(mixedL)
+#predicted
+#x-axis people
+#y-axis visits for that person
+plot(full_set$p_Iners[which(names(linpred) %in% rownames(full_set))], linpred)
+```
+
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
 

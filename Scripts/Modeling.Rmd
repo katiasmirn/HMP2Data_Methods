@@ -25,6 +25,9 @@ library(vegan)
 library(refund)
 library(reshape2)
 library(kableExtra)
+remotes::install_github("palday/coefplot2",
+           subdir = "pkg")
+library(coefplot2)
 #library(HMP2Data) #install the library from github
 ```
 
@@ -74,25 +77,44 @@ Varnames <- c("vaginal_pH", "number of visits", "reported_ga", "gestational age 
 stratified1 = tableone::CreateTableOne(
   vars = Varnames[1:3],
   data = summarytools::unlabel(demog), strata = "race", includeNA = TRUE)
-stratified1 <- print(stratified1, printToggle = FALSE, showAllLevels = FALSE)
-stratified1 = stratified1[,!(colnames(stratified1) %in% "test")]%>%
-  knitr::kable(format="latex")%>% 
-  kable_styling("striped", full_width = F, font_size = 9)
+#stratified1 <- print(stratified1, printToggle = FALSE, showAllLevels = FALSE)
+#stratified1 = stratified1[,!(colnames(stratified1) %in% "test")]%>%
+#  knitr::kable(format="latex")%>% 
+#  kable_styling("striped", full_width = F, font_size = 9)
 stratified1
 
 ```
 
 ```{r}
-aggregate(Lactobacillus_iners ~ race+reported_ga, full_set, mean)
+count_table <- aggregate(list(full_set$Lactobacillus_iners, full_set$p_Iners), by = list(full_set$race, full_set$reported_ga), mean)
+colnames(count_table) <- c("race", "reported_ga", "Lactobacillus_iners", "p_Iners")
+kable(count_table) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
 #Look at iners over visits
-aggregate(p_Iners ~ race+reported_ga, full_set, mean)
+prop_table <- aggregate(p_Iners ~ race+reported_ga, full_set, mean)
+kable(prop_table) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
 
+#Plot proportions over time
+ggplot(count_table, aes(reported_ga, p_Iners)) + 
+  geom_line(aes(group=race, color=race)) + 
+  facet_wrap(~race, ncol=1)
+ggplot(count_table, aes(reported_ga, p_Iners)) + 
+  geom_line(aes(group=race, color=race)) 
 ```
 
 
 
-```{r CountData}
+```{r distrubtions}
 hist(full_set$Lactobacillus_iners)
+count_plot <- ggplot(full_set, aes(Lactobacillus_iners)) + geom_histogram() + ggtitle("Iners Count Histogram")
+count_plot
+prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram() + ggtitle("Iners Proportion Histogram")
+prop_plot
+
+```
+
+```{r Count}
 #Zero-Inflated Poisson Model
 z <- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + (1|SUBJECT_ID), data = full_set, family = poisson, zi = ~ vaginal_pH + reported_ga + alpha_div)
 summary(z)
@@ -141,15 +163,27 @@ var(full_set$p_Iners)
 library(zoib)
 #zoib
 #zoib(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race | 1|1, data = full_set, random = 1, EUID = full_set$SUBJECT_ID)
+library(aod)
+full_set$p_Iners[which(full_set$p_Iners == 1)] <- 0.99999
+betaIners <- glmmTMB(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set, family=beta_family(link = "logit"), zi = ~ 1)
+betapred <- predict(betaIners)
+summary(betaIners)
+#predicted
+#x-axis people
+#y-axis visits for that person
+#plot(full_set$p_Iners[which(names(betapred) %in% rownames(full_set))], betapred)
 
-
-
-
-zoib(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race | 1, data = full_set)
+#zoib(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race | 1, data = full_set)
 
 
 mixedL <- lmer(p_Iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set)
+
+#par(mfrow = c(2,2))
+
+coefplot2(mixedL)
+plot(mixedL)
 linpred <- predict(mixedL)
+
 #predicted
 #x-axis people
 #y-axis visits for that person

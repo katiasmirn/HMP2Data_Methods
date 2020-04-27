@@ -30,6 +30,8 @@ library(kableExtra)
 remotes::install_github("palday/coefplot2",
            subdir = "pkg")
 library(coefplot2)
+library(ggpubr)
+
 #library(HMP2Data) #install the library from github
 ```
 
@@ -53,6 +55,11 @@ full_set <- cbind(t_otu, meta)
 full_set$alpha_div <- diversity(full_set[,1:length(names(t_otu))], index="shannon")
 full_set$num_reads <- rowSums(t_otu)
 full_set$p_Iners <- full_set$Lactobacillus_iners/full_set$num_reads
+full_set$p_Snea <- full_set$Sneathia_amnii/full_set$num_reads
+full_set$p_Prev <- full_set$Prevotella_cluster2/full_set$num_reads
+full_set$p_TM <- full_set$`TM7_OTU-H1`/full_set$num_reads
+full_set$p_BVAB <- full_set$Lachnospiraceae_BVAB1/full_set$num_reads
+
 ```
 
 ```{r}
@@ -111,13 +118,13 @@ stratified1
 ```{r}
 count_table <- aggregate(list(full_set$Lactobacillus_iners, full_set$p_Iners), by = list(full_set$race, full_set$reported_ga), mean)
 colnames(count_table) <- c("race", "reported_ga", "Lactobacillus_iners", "p_Iners")
-kable(count_table) %>%
+count_table <- count_table %>%
+  arrange(race)
+kable(count_table,  table.attr = "style = \"color: black;\"") %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
-#Look at iners over visits
-prop_table <- aggregate(p_Iners ~ race+reported_ga, full_set, mean)
-kable(prop_table) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"))
+```
 
+```{r }
 #Plot proportions over time, plot count over time
 ggplot(count_table, aes(reported_ga, p_Iners)) + 
   geom_line(aes(group=race, color=race)) + 
@@ -126,9 +133,9 @@ ggplot(count_table, aes(reported_ga, p_Iners)) +
   geom_line(aes(group=race, color=race)) 
 
 #Plot individuals for each race
-ggplot(full_set, aes(reported_ga, p_Iners)) + 
-  geom_line(aes(group=SUBJECT_ID, color=race)) + 
-  facet_wrap(~race, ncol=1)
+#ggplot(full_set, aes(reported_ga, p_Iners)) + 
+#  geom_line(aes(group=SUBJECT_ID, color=race)) + 
+#  facet_wrap(~race, ncol=1)
 ```
 
 
@@ -137,13 +144,47 @@ ggplot(full_set, aes(reported_ga, p_Iners)) +
 hist(full_set$Lactobacillus_iners)
 count_plot <- ggplot(full_set, aes(Lactobacillus_iners)) + geom_histogram() + ggtitle("Iners Count Histogram")
 count_plot
-prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram() + ggtitle("Iners Summary Proportion Histogram")
-prop_plot
+
 #stratify by race
-race_prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Iners Proportion Histogram")
-race_prop_plot
+
 #vagitype
 ```
+
+
+
+```{r}
+prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram()
+#prop_plot
+iprop_plot <- ggplot(full_set, aes(p_Snea)) + geom_histogram() 
+#iprop_plot
+
+pprop_plot <- ggplot(full_set, aes(p_Prev)) + geom_histogram() 
+#pprop_plot
+
+tprop_plot <- ggplot(full_set, aes(p_TM)) + geom_histogram()
+#tprop_plot
+
+bprop_plot <- ggplot(full_set, aes(p_BVAB)) + geom_histogram()
+#bprop_plot
+#stratify by race
+ggarrange(prop_plot, iprop_plot, tprop_plot, pprop_plot, bprop_plot, labels = c("Iners", "Sneathia", "TM7", "Prevotella", "BVAB1"), ncol = 3, nrow = 2)
+
+```
+
+```{r}
+race_prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Iners Proportion Histogram")
+race_prop_plot
+irace_prop_plot <- ggplot(full_set, aes(p_Snea)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Sneathia Proportion Histogram")
+irace_prop_plot
+#stratify by race
+prace_prop_plot <- ggplot(full_set, aes(p_Prev)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Prevotella Proportion Histogram")
+prace_prop_plot
+trace_prop_plot <- ggplot(full_set, aes(p_TM)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("TM7 Proportion Histogram")
+trace_prop_plot
+brace_prop_plot <- ggplot(full_set, aes(p_BVAB)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("BVAB Proportion Histogram")
+brace_prop_plot
+```
+
 
 ```{r Count}
 #Zero-Inflated Poisson Model
@@ -229,6 +270,224 @@ plot(full_set$p_Iners[which(names(linpred) %in% rownames(full_set))], linpred)
 2. dichotomize, try different taxa
 
 3. aa vs caucasian
+
+```{r}
+mypropdata <- full_set[,colnames(t_otu)]
+mytypes <- apply(mypropdata,1,which.max)
+maxprop <- as.numeric(mypropdata[matrix(c(1:nrow(mypropdata),mytypes), ncol=2)])
+mytypes <- colnames(mypropdata)[mytypes]
+mytypes[maxprop < 0.3] <- "No Type"
+mytypes <- as.factor(mytypes)f
+full_set <- full_set %>%
+  mutate(vagitype=mytypes)
+
+full_set$class_Iners <- as.factor(ifelse(full_set$p_Iners > 0.3, "High", "Low"))
+full_set$class_Snea <- as.factor(ifelse(full_set$p_Snea > 0.3, "High", "Low"))
+full_set$class_Prev <- as.factor(ifelse(full_set$p_Prev > 0.3, "High", "Low"))
+full_set$class_TM <- as.factor(ifelse(full_set$p_TM > 0.3, "High", "Low"))
+full_set$class_BVAB <- as.factor(ifelse(full_set$p_BVAB > 0.3, "High", "Low"))
+```
+
+
+```{r}
+#install.packages("ggpubr")
+iners_plot <- ggplot(full_set, aes(class_Iners)) + geom_bar()
+snea_plot <- ggplot(full_set, aes(class_Snea)) + geom_bar() 
+tm_plot <- ggplot(full_set, aes(class_TM)) + geom_bar() 
+prev_plot <- ggplot(full_set, aes(class_Prev)) + geom_bar() 
+bvab_plot <- ggplot(full_set, aes(class_BVAB)) + geom_bar()
+
+ggarrange(iners_plot, snea_plot, tm_plot, prev_plot, bvab_plot, labels = c("Iners", "Sneathia", "TM7", "Prevotella", "BVAB1"), ncol = 3, nrow = 2)
+```
+
+```{r}
+#Distribution of High and Low (do it across race)
+irace_prop_plot <- ggplot(full_set, aes(class_Iners)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Iners Dichotomized Histogram")
+irace_prop_plot
+
+#Distribution of High and Low (do it across race)
+srace_prop_plot <- ggplot(full_set, aes(class_Snea)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Sneathia Dichotomized Histogram")
+srace_prop_plot
+
+#Distribution of High and Low (do it across race)
+prace_prop_plot <- ggplot(full_set, aes(class_Prev)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Prevotella Dichotomized Histogram")
+prace_prop_plot
+
+#Distribution of High and Low (do it across race)
+trace_prop_plot <- ggplot(full_set, aes(class_TM)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("TM7 Dichotomized Histogram")
+trace_prop_plot
+
+#Distribution of High and Low (do it across race)
+brace_prop_plot <- ggplot(full_set, aes(class_BVAB)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("BVAB Dichotomized Histogram")
+brace_prop_plot
+```
+
+
+```{r}
+library(caret)
+
+#Split Data 80:20
+training.samps <- full_set$class_Iners %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data <- full_set[training.samps,]
+test.data <- full_set[-training.samps,]
+#Linear discriminant analysis
+#install.packages("mda")
+library(mda)
+covs_test <- as.data.frame(test.data[,cov])
+full_set$vagitype <- as.factor(full_set$vagitype)
+full_set$SUBJECT_ID <- as.factor(full_set$SUBJECT_ID)
+mda_model <- mda(class_Iners ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + income + SUBJECT_ID, data = full_set)
+#summary(mda_model)
+mda_model$percent.explained
+mda_model$confusion
+covs <- covs[which(names(pred) %in% rownames(full_set)),]
+#mda_pred <- predict(mda_model,test.data)
+
+
+# SVM
+library(e1071)
+rownames(full_set) <- rownames(meta)
+cov <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "income", "SUBJECT_ID")
+covs <- as.data.frame(full_set[,cov])
+svm_model <- svm(class_Iners ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + income + SUBJECT_ID, data = full_set, type = "C")
+pred <- predict(svm_model, covs)
+table(pred, full_set$class_Iners[which(names(pred) %in% rownames(full_set))])
+#Random Forest
+#try randomforest with formula and see if random var works
+#install.packages("randomForest")
+#library(randomForest)
+#full_set$vagitype <- as.character(full_set$vagitype)
+#full_set$SUBJECT_ID <- as.character(full_set$SUBJECT_ID)
+#forest_model <- randomForest(class_Iners ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = full_set, na.action=na.omit, importance = TRUE)
+
+```
+
+```{r Snea}
+
+#Split Data 80:20
+training.samps <- full_set$class_Snea %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data <- full_set[training.samps,]
+test.data <- full_set[-training.samps,]
+#Linear discriminant analysis
+#install.packages("mda")
+library(mda)
+covs_test <- as.data.frame(test.data[,cov])
+full_set$vagitype <- as.factor(full_set$vagitype)
+full_set$SUBJECT_ID <- as.factor(full_set$SUBJECT_ID)
+mda_model <- mda(class_Snea ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = train.data)
+#summary(mda_model)
+mda_model$percent.explained
+mda_model$confusion
+covs <- covs[which(names(pred) %in% rownames(full_set)),]
+#mda_pred <- predict(mda_model,test.data)
+
+
+# SVM
+library(e1071)
+rownames(full_set) <- rownames(meta)
+cov <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "SUBJECT_ID")
+covs <- as.data.frame(full_set[,cov])
+svm_model <- svm(class_Snea ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = full_set, type = "C")
+pred <- predict(svm_model, covs)
+table(pred, full_set$class_Snea[which(names(pred) %in% rownames(full_set))])
+```
+
+
+```{r Prev}
+
+#Split Data 80:20
+training.samps <- full_set$class_Prev %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data <- full_set[training.samps,]
+test.data <- full_set[-training.samps,]
+#Linear discriminant analysis
+#install.packages("mda")
+library(mda)
+covs_test <- as.data.frame(test.data[,cov])
+full_set$vagitype <- as.factor(full_set$vagitype)
+full_set$SUBJECT_ID <- as.factor(full_set$SUBJECT_ID)
+mda_model <- mda(class_Prev ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = train.data)
+#summary(mda_model)
+mda_model$percent.explained
+covs <- covs[which(names(pred) %in% rownames(full_set)),]
+mda_model$confusion
+
+#mda_pred <- predict(mda_model,test.data)
+
+
+# SVM
+library(e1071)
+rownames(full_set) <- rownames(meta)
+cov <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "SUBJECT_ID")
+covs <- as.data.frame(full_set[,cov])
+svm_model <- svm(class_Prev ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = full_set, type = "C")
+pred <- predict(svm_model, covs)
+table(pred, full_set$class_Prev[which(names(pred) %in% rownames(full_set))])
+```
+
+```{r TM7}
+
+#Split Data 80:20
+training.samps <- full_set$class_TM %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data <- full_set[training.samps,]
+test.data <- full_set[-training.samps,]
+#Linear discriminant analysis
+#install.packages("mda")
+library(mda)
+covs_test <- as.data.frame(test.data[,cov])
+full_set$vagitype <- as.factor(full_set$vagitype)
+full_set$SUBJECT_ID <- as.factor(full_set$SUBJECT_ID)
+mda_model <- mda(class_TM ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = train.data)
+#summary(mda_model)
+mda_model$percent.explained
+covs <- covs[which(names(pred) %in% rownames(full_set)),]
+mda_model$confusion
+#mda_pred <- predict(mda_model,test.data)
+
+
+# SVM
+library(e1071)
+rownames(full_set) <- rownames(meta)
+cov <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "SUBJECT_ID")
+covs <- as.data.frame(full_set[,cov])
+svm_model <- svm(class_TM ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = full_set, type = "C")
+pred <- predict(svm_model, covs)
+table(pred, full_set$class_TM[which(names(pred) %in% rownames(full_set))])
+```
+
+```{r BVAB}
+
+#Split Data 80:20
+training.samps <- full_set$class_BVAB %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data <- full_set[training.samps,]
+test.data <- full_set[-training.samps,]
+#Linear discriminant analysis
+#install.packages("mda")
+library(mda)
+covs_test <- as.data.frame(test.data[,cov])
+full_set$vagitype <- as.factor(full_set$vagitype)
+full_set$SUBJECT_ID <- as.factor(full_set$SUBJECT_ID)
+mda_model <- mda(class_BVAB ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = train.data)
+#summary(mda_model)
+mda_model$percent.explained
+covs <- covs[which(names(pred) %in% rownames(full_set)),]
+mda_model$confusion
+#mda_pred <- predict(mda_model,test.data)
+
+
+# SVM
+library(e1071)
+rownames(full_set) <- rownames(meta)
+cov <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "SUBJECT_ID")
+covs <- as.data.frame(full_set[,cov])
+svm_model <- svm(class_BVAB ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + SUBJECT_ID, data = full_set, type = "C")
+pred <- predict(svm_model, covs)
+table(pred, full_set$class_BVAB[which(names(pred) %in% rownames(full_set))])
+```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
 

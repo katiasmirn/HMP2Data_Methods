@@ -27,8 +27,10 @@ library(vegan)
 library(refund)
 library(reshape2)
 library(kableExtra)
-remotes::install_github("palday/coefplot2",
-           subdir = "pkg")
+library(lme4)
+library(MASS)
+#remotes::install_github("palday/coefplot2",
+#           subdir = "pkg")
 library(coefplot2)
 library(ggpubr)
 
@@ -54,10 +56,23 @@ meta$X <- NULL
 full_set <- cbind(t_otu, meta)
 full_set$alpha_div <- diversity(full_set[,1:length(names(t_otu))], index="shannon")
 full_set$num_reads <- rowSums(t_otu)
+full_set <- full_set %>%
+  filter(race == "african_american" | race == "caucasian")
+full_set$race <- factor(full_set$race)
+
+mypropdata <- full_set[,colnames(t_otu)]
+mytypes <- apply(mypropdata,1,which.max)
+maxprop <- as.numeric(mypropdata[matrix(c(1:nrow(mypropdata),mytypes), ncol=2)])
+mytypes <- colnames(mypropdata)[mytypes]
+mytypes[maxprop < 0.3] <- "No Type"
+mytypes <- as.factor(mytypes)
+full_set <- full_set %>%
+  mutate(vagitype=mytypes)
+high_vagitype <- sort(table(full_set$vagitype), decreasing=T)[1:5]
 full_set$p_Iners <- full_set$Lactobacillus_iners/full_set$num_reads
-full_set$p_Snea <- full_set$Sneathia_amnii/full_set$num_reads
-full_set$p_Prev <- full_set$Prevotella_cluster2/full_set$num_reads
-full_set$p_TM <- full_set$`TM7_OTU-H1`/full_set$num_reads
+full_set$p_Crisp <- full_set$Lactobacillus_crispatus_cluster/full_set$num_reads
+full_set$p_Gard <- full_set$Gardnerella_vaginalis/full_set$num_reads
+full_set$Gass <- full_set$Lactobacillus_gasseri_cluster/full_set$num_reads
 full_set$p_BVAB <- full_set$Lachnospiraceae_BVAB1/full_set$num_reads
 
 ```
@@ -116,8 +131,10 @@ stratified1
 ```
 
 ```{r}
-count_table <- aggregate(list(full_set$Lactobacillus_iners, full_set$p_Iners), by = list(full_set$race, full_set$reported_ga), mean)
-colnames(count_table) <- c("race", "reported_ga", "Lactobacillus_iners", "p_Iners")
+
+count_table <- aggregate(list(full_set$Lactobacillus_iners, full_set$p_Iners,full_set$Lactobacillus_crispatus_cluster, full_set$p_Crisp, full_set$Gardnerella_vaginalis, full_set$p_Gard, full_set$Lactobacillus_gasseri_cluster, full_set$Gass, full_set$Lachnospiraceae_BVAB1, full_set$p_BVAB), by = list(full_set$race, full_set$reported_ga), mean)
+colnames(count_table) <- c("race", "reported_ga", "Lactobacillus_iners", "p_Iners", "Crispatus", "p_Crisp", 
+                           "Gardnerella", "p_Gard", "Gasseri", "p_Gass", "BVAB", "p_BVAB")
 count_table <- count_table %>%
   arrange(race)
 kable(count_table,  table.attr = "style = \"color: black;\"") %>%
@@ -126,12 +143,18 @@ kable(count_table,  table.attr = "style = \"color: black;\"") %>%
 
 ```{r }
 #Plot proportions over time, plot count over time
-ggplot(count_table, aes(reported_ga, p_Iners)) + 
-  geom_line(aes(group=race, color=race)) + 
-  facet_wrap(~race, ncol=1)
-ggplot(count_table, aes(reported_ga, p_Iners)) + 
+iners <- ggplot(count_table, aes(reported_ga, p_Iners)) + 
   geom_line(aes(group=race, color=race)) 
-
+crisp <- ggplot(count_table, aes(reported_ga, p_Crisp)) + 
+  geom_line(aes(group=race, color=race)) 
+gard <- ggplot(count_table, aes(reported_ga, p_Gard)) + 
+  geom_line(aes(group=race, color=race)) 
+gass <- ggplot(count_table, aes(reported_ga, p_Gass)) + 
+  geom_line(aes(group=race, color=race)) 
+bvab <- ggplot(count_table, aes(reported_ga, p_BVAB)) + 
+  geom_line(aes(group=race, color=race)) 
+library(gridExtra)
+ggarrange(iners, crisp, bvab, gard, gass, nrow = 3)
 #Plot individuals for each race
 #ggplot(full_set, aes(reported_ga, p_Iners)) + 
 #  geom_line(aes(group=SUBJECT_ID, color=race)) + 
@@ -139,50 +162,39 @@ ggplot(count_table, aes(reported_ga, p_Iners)) +
 ```
 
 
-
-```{r distrubtions}
-hist(full_set$Lactobacillus_iners)
-count_plot <- ggplot(full_set, aes(Lactobacillus_iners)) + geom_histogram() + ggtitle("Iners Count Histogram")
-count_plot
-
-#stratify by race
-
-#vagitype
-```
-
-
-
 ```{r}
 prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram()
 #prop_plot
-iprop_plot <- ggplot(full_set, aes(p_Snea)) + geom_histogram() 
+cprop_plot <- ggplot(full_set, aes(p_Crisp)) + geom_histogram() 
 #iprop_plot
 
-pprop_plot <- ggplot(full_set, aes(p_Prev)) + geom_histogram() 
+bprop_plot <- ggplot(full_set, aes(p_BVAB)) + geom_histogram() 
 #pprop_plot
 
-tprop_plot <- ggplot(full_set, aes(p_TM)) + geom_histogram()
+gprop_plot <- ggplot(full_set, aes(p_Gard)) + geom_histogram()
 #tprop_plot
 
-bprop_plot <- ggplot(full_set, aes(p_BVAB)) + geom_histogram()
+gasprop_plot <- ggplot(full_set, aes(Gass)) + geom_histogram()
 #bprop_plot
 #stratify by race
-ggarrange(prop_plot, iprop_plot, tprop_plot, pprop_plot, bprop_plot, labels = c("Iners", "Sneathia", "TM7", "Prevotella", "BVAB1"), ncol = 3, nrow = 2)
+ggarrange(prop_plot, cprop_plot, bprop_plot, gprop_plot, gasprop_plot, labels = c("Iners","Crisp", "BVAB", "Gard", "Gass"), ncol = 3, nrow = 2)
 
 ```
 
 ```{r}
-race_prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Iners Proportion Histogram")
-race_prop_plot
-irace_prop_plot <- ggplot(full_set, aes(p_Snea)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Sneathia Proportion Histogram")
-irace_prop_plot
+race_prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram(aes(group=race, fill=race)) + facet_wrap(~race) 
+
+crace_prop_plot <- ggplot(full_set, aes(p_Crisp)) + geom_histogram(aes(group=race, fill=race)) + facet_wrap(~race) 
+
 #stratify by race
-prace_prop_plot <- ggplot(full_set, aes(p_Prev)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Prevotella Proportion Histogram")
-prace_prop_plot
-trace_prop_plot <- ggplot(full_set, aes(p_TM)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("TM7 Proportion Histogram")
-trace_prop_plot
-brace_prop_plot <- ggplot(full_set, aes(p_BVAB)) + geom_histogram(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("BVAB Proportion Histogram")
-brace_prop_plot
+brace_prop_plot <- ggplot(full_set, aes(p_BVAB)) + geom_histogram(aes(group=race, fill=race)) + facet_wrap(~race) 
+
+grace_prop_plot <- ggplot(full_set, aes(p_Gard)) + geom_histogram(aes(group=race, fill=race)) + facet_wrap(~race)
+
+gassrace_prop_plot <- ggplot(full_set, aes(Gass)) + geom_histogram(aes(group=race, fill=race)) + facet_wrap(~race)
+
+ggarrange(race_prop_plot, crace_prop_plot, brace_prop_plot, grace_prop_plot, gassrace_prop_plot, nrow = 3)
+
 ```
 
 
@@ -272,56 +284,76 @@ plot(full_set$p_Iners[which(names(linpred) %in% rownames(full_set))], linpred)
 3. aa vs caucasian
 
 ```{r}
-mypropdata <- full_set[,colnames(t_otu)]
-mytypes <- apply(mypropdata,1,which.max)
-maxprop <- as.numeric(mypropdata[matrix(c(1:nrow(mypropdata),mytypes), ncol=2)])
-mytypes <- colnames(mypropdata)[mytypes]
-mytypes[maxprop < 0.3] <- "No Type"
-mytypes <- as.factor(mytypes)f
-full_set <- full_set %>%
-  mutate(vagitype=mytypes)
-
-full_set$class_Iners <- as.factor(ifelse(full_set$p_Iners > 0.3, "High", "Low"))
-full_set$class_Snea <- as.factor(ifelse(full_set$p_Snea > 0.3, "High", "Low"))
-full_set$class_Prev <- as.factor(ifelse(full_set$p_Prev > 0.3, "High", "Low"))
-full_set$class_TM <- as.factor(ifelse(full_set$p_TM > 0.3, "High", "Low"))
-full_set$class_BVAB <- as.factor(ifelse(full_set$p_BVAB > 0.3, "High", "Low"))
+full_set$class_Iners <- as.factor(ifelse(full_set$p_Iners > mean(full_set$p_Iners), "High", "Low"))
+full_set$class_Crisp <- as.factor(ifelse(full_set$p_Crisp > mean(full_set$p_Crisp), "High", "Low"))
+full_set$class_Gass <- as.factor(ifelse(full_set$Gass > mean(full_set$Gass), "High", "Low"))
+full_set$class_Gard <- as.factor(ifelse(full_set$p_Gard > mean(full_set$p_Gard), "High", "Low"))
+full_set$class_BVAB <- as.factor(ifelse(full_set$p_BVAB > mean(full_set$p_BVAB), "High", "Low"))
 ```
 
 
 ```{r}
 #install.packages("ggpubr")
 iners_plot <- ggplot(full_set, aes(class_Iners)) + geom_bar()
-snea_plot <- ggplot(full_set, aes(class_Snea)) + geom_bar() 
-tm_plot <- ggplot(full_set, aes(class_TM)) + geom_bar() 
-prev_plot <- ggplot(full_set, aes(class_Prev)) + geom_bar() 
+snea_plot <- ggplot(full_set, aes(class_Crisp)) + geom_bar() 
+tm_plot <- ggplot(full_set, aes(class_Gass)) + geom_bar() 
+prev_plot <- ggplot(full_set, aes(class_Gard)) + geom_bar() 
 bvab_plot <- ggplot(full_set, aes(class_BVAB)) + geom_bar()
 
-ggarrange(iners_plot, snea_plot, tm_plot, prev_plot, bvab_plot, labels = c("Iners", "Sneathia", "TM7", "Prevotella", "BVAB1"), ncol = 3, nrow = 2)
+ggarrange(iners_plot, snea_plot, tm_plot, prev_plot, bvab_plot, labels = c("Iners", "Crisp", "Gass", "Gard", "BVAB1"), ncol = 3, nrow = 2)
 ```
 
 ```{r}
 #Distribution of High and Low (do it across race)
-irace_prop_plot <- ggplot(full_set, aes(class_Iners)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Iners Dichotomized Histogram")
+irace_prop_plot <- ggplot(full_set, aes(class_Iners)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("Iners Dichotomized Histogram")
 irace_prop_plot
 
 #Distribution of High and Low (do it across race)
-srace_prop_plot <- ggplot(full_set, aes(class_Snea)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Sneathia Dichotomized Histogram")
+srace_prop_plot <- ggplot(full_set, aes(class_Crisp)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("Crisp Dichotomized Histogram")
 srace_prop_plot
 
 #Distribution of High and Low (do it across race)
-prace_prop_plot <- ggplot(full_set, aes(class_Prev)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("Prevotella Dichotomized Histogram")
+prace_prop_plot <- ggplot(full_set, aes(class_Gass)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("Gass Dichotomized Histogram")
 prace_prop_plot
 
 #Distribution of High and Low (do it across race)
-trace_prop_plot <- ggplot(full_set, aes(class_TM)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("TM7 Dichotomized Histogram")
+trace_prop_plot <- ggplot(full_set, aes(class_Gard)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("Gard Dichotomized Histogram")
 trace_prop_plot
 
 #Distribution of High and Low (do it across race)
-brace_prop_plot <- ggplot(full_set, aes(class_BVAB)) + geom_bar(aes(group=race, color=race)) + facet_wrap(~race, ncol=3) + ggtitle("BVAB Dichotomized Histogram")
+brace_prop_plot <- ggplot(full_set, aes(class_BVAB)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("BVAB Dichotomized Histogram")
 brace_prop_plot
+
+ggarrange(irace_prop_plot, srace_prop_plot, prace_prop_plot, trace_prop_plot, brace_prop_plot, nrow = 3)
+
 ```
 
+
+```{r}
+na.test <-  function (x) {
+  w <- sapply(x, function(x)all(is.na(x)))
+  if (any(w)) {
+    stop(paste("All NA in columns", paste(which(w), collapse=", ")))
+  }
+}
+#Logistic Regression Classifier
+#AICstepwise
+#Add more variables
+take_out <- c('SUBJECT_ID', names(t_otu), 'p_Iners', 'class_Iners')
+form <- paste0(setdiff(names(full_set), c(names(full_set[,apply(full_set, 2, function(x) any(is.na(x)))]),names(full_set[,apply(full_set, 2, function(x) any(n_distinct(x) == 1))]),'SUBJECT_ID', names(t_otu), 'p_Iners', 'class_Iners')), collapse = " + ")
+form <- paste0(form, "+ reported_ga + vaginal_pH + (1|SUBJECT_ID)")
+form <- as.formula(paste("class_Iners", '~', form))
+
+#does not appear that using all of the possible variables works for log regression, also tried with less
+#variables and got same resuts
+
+log_mod <- glmer(form, data = full_set, family = binomial) #Does not run
+
+step.model <- stepAIC(log_mod, direction = "both", 
+                      trace = FALSE)
+
+
+```
 
 ```{r}
 library(caret)

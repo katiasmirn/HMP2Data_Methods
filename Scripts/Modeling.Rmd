@@ -29,6 +29,8 @@ library(reshape2)
 library(kableExtra)
 library(lme4)
 library(MASS)
+library(forcats)
+library(GGally)
 #remotes::install_github("palday/coefplot2",
 #           subdir = "pkg")
 library(coefplot2)
@@ -51,15 +53,90 @@ rownames(otu) <- otu$X
 otu$X <- NULL 
 t_otu <- as.data.frame(t(otu))
 meta <- read.csv(file = file.path(path2, "MergedFiles", "Meta_data.csv"))
+#physical activity variable
+phys <- meta[,98:100]
+meta$phys <- ifelse(meta$physical_activity_vigorous == "0_times" | is.na(meta$physical_activity_vigorous), "None", "Vigorous")
+meta$phys[which(meta$phys == "None" & meta$physical_activity_moderate != "0_times" & !is.na(meta$physical_activity_moderate))] <- "Moderate"
+meta$phys[which(meta$phys == "None" & meta$physical_activity_light != "0_times" & !is.na(meta$physical_activity_light))] <- "Light"
+meta$phys <- as.factor(meta$phys)
+
+#filter to just two races
+meta <- meta %>%
+  filter(race == "african_american" | race == "caucasian")
+meta$race <- factor(meta$race)
 rownames(meta) <- meta$X
 meta$X <- NULL
+t_otu <- t_otu[rownames(meta),]
+```
+
+```{r EditMeta}
+meta <- meta %>%
+  mutate(antibiotics_current = replace_na(antibiotics_current, "No"))
+
+meta <- meta %>%
+  mutate(infertility_treatment = replace_na(infertility_treatment, "No")) %>%
+  mutate(infertility_treatment = recode(infertility_treatment, Not_sure = "No", .default = levels(meta$infertility_treatment)))
+
+meta <- meta %>%
+  mutate(vdischarge = replace_na(vdischarge, "No")) %>%
+  mutate(vdischarge = recode(vdischarge, Not_Sure = "No", .default = levels(meta$vdischarge)))
+
+meta <- meta %>%
+  mutate(vodor = replace_na(vodor, "No")) %>%
+  mutate(vodor = recode(vodor, Not_Sure = "No", .default = levels(meta$vodor)))
+
+meta <- meta %>%
+  mutate(vitching = replace_na(vitching, "No"))
+
+meta <- meta %>%
+  mutate(douche = replace_na(douche, "More_than_1_year_ago_or_never"))
+
+meta <- meta %>%
+  mutate(bv_history = replace_na(bv_history, "No")) %>%
+  mutate(bv_history = recode(bv_history, Not_Sure = "No", .default = levels(meta$bv_history)))
+
+meta <- meta %>%
+  mutate(vaginitis_history = replace_na(vaginitis_history, "No"))
+
+meta <- meta %>%
+  mutate(current_medications = replace_na(current_medications, "No")) %>%
+  mutate(current_medications = recode(current_medications, No_I_am_not_taking_any_new_medications = "No", .default = levels(meta$current_medications)))
+
+meta <- meta %>%
+  mutate(smoker_current = replace_na(smoker_current, "No"))
+
+meta <- meta %>%
+  mutate(alcohol_frequency_year = replace_na(alcohol_frequency_year, "0_times"))
+
+meta <- meta %>%
+  mutate(diabetes = replace_na(diabetes, "No")) %>%
+  mutate(diabetes = recode(diabetes, Not_sure = "No", .default = levels(meta$diabetes)))
+
+meta <- meta %>%
+  mutate(no_false_labor = replace_na(no_false_labor, "Yes")) %>%
+  mutate(no_false_labor = recode(no_false_labor, No_I_have_not_experienced_false_labor = "Yes", .default = levels(meta$no_false_labor)))
+
+meta <- meta %>%
+  mutate(no_high_bp = replace_na(no_high_bp, "Yes"))
+
+meta <- meta %>%
+  mutate(no_vbleeding = replace_na(no_vbleeding, "Yes"))
+
+meta <- meta %>%
+  mutate(progesterone = replace_na(progesterone, "No")) %>%
+  mutate(progesterone = recode(progesterone, Not_Sure = "No", .default = levels(meta$progesterone)))
+
+
+```
+
+
+```{r }
+#Create combined table
 full_set <- cbind(t_otu, meta)
 full_set$alpha_div <- diversity(full_set[,1:length(names(t_otu))], index="shannon")
 full_set$num_reads <- rowSums(t_otu)
-full_set <- full_set %>%
-  filter(race == "african_american" | race == "caucasian")
-full_set$race <- factor(full_set$race)
 
+#Add vagitype
 mypropdata <- full_set[,colnames(t_otu)]
 mytypes <- apply(mypropdata,1,which.max)
 maxprop <- as.numeric(mypropdata[matrix(c(1:nrow(mypropdata),mytypes), ncol=2)])
@@ -69,6 +146,8 @@ mytypes <- as.factor(mytypes)
 full_set <- full_set %>%
   mutate(vagitype=mytypes)
 high_vagitype <- sort(table(full_set$vagitype), decreasing=T)[1:5]
+high_vagitype
+#Add proportions
 full_set$p_Iners <- full_set$Lactobacillus_iners/full_set$num_reads
 full_set$p_Crisp <- full_set$Lactobacillus_crispatus_cluster/full_set$num_reads
 full_set$p_Gard <- full_set$Gardnerella_vaginalis/full_set$num_reads
@@ -76,6 +155,10 @@ full_set$Gass <- full_set$Lactobacillus_gasseri_cluster/full_set$num_reads
 full_set$p_BVAB <- full_set$Lachnospiraceae_BVAB1/full_set$num_reads
 
 ```
+
+
+
+
 
 ```{r}
 get_mode = function(x, multimodal.na="TRUE"){
@@ -97,12 +180,100 @@ df <- aggregate(visit_number ~ SUBJECT_ID, data = meta%>%data.frame, FUN = lengt
 colnames(df)[which(colnames(df) == "visit_number")] <- "number of visits"
 demog <- merge(demog,df, by = c("SUBJECT_ID") )
 
-#number visits per subject 
+#average income per subject 
 df <- meta %>% group_by(SUBJECT_ID) %>% summarise(income = get_mode(income, multimodal.na = "FALSE"))
 colnames(df)[which(colnames(df) == "income")] <- "average income"
 demog <- merge(demog,df, by = c("SUBJECT_ID") )
 
+#average education per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(education = get_mode(education, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "education")] <- "average education"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
 
+#average age per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(age = get_mode(age, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "age")] <- "average age"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average prenatal care start per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(prenatal_care_start = get_mode(prenatal_care_start, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "prenatal_care_start")] <- "average p_care_start"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average infertility treatment per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(infertility_treatment = get_mode(infertility_treatment, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "infertility_treatment")] <- "average inf_trt"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average v_discharge per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(vdischarge = get_mode(vdischarge, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "vdischarge")] <- "average v_discharge"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average v_odor per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(vodor = get_mode(vodor, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "vodor")] <- "average v_odor"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average v_itching per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(vitching = get_mode(vitching, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "vitching")] <- "average v_itching"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average douche per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(douche = get_mode(douche, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "douche")] <- "average douche"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average bv_history per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(bv_history = get_mode(bv_history, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "bv_history")] <- "average bv_history"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average vaginitis_history per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(vaginitis_history = get_mode(vaginitis_history, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "vaginitis_history")] <- "average vaginitis_history"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average current_medications per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(current_medications = get_mode(current_medications, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "current_medications")] <- "average current_medications"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average smoker_current per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(smoker_current = get_mode(smoker_current, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "smoker_current")] <- "average smoker_current"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average alcohol_frequency per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(alcohol_frequency_year = get_mode(alcohol_frequency_year, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "alcohol_frequency_year")] <- "average alcohol_frequency"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average diabetes per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(diabetes = get_mode(diabetes, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "diabetes")] <- "average diabetes"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average false_labor per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(no_false_labor = get_mode(no_false_labor, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "no_false_labor")] <- "average no_false_labor"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average high_bp per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(no_high_bp = get_mode(no_high_bp, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "no_high_bp")] <- "average no_high_bp"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average v_bleeding per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(no_vbleeding = get_mode(no_vbleeding, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "no_vbleeding")] <- "average no_vbleeding"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
+
+#average progesterone per subject 
+df <- meta %>% group_by(SUBJECT_ID) %>% summarise(progesterone = get_mode(progesterone, multimodal.na = "FALSE"))
+colnames(df)[which(colnames(df) == "progesterone")] <- "average progesterone"
+demog <- merge(demog,df, by = c("SUBJECT_ID") )
 
 #average vaginal_ph across visits
 #Some patients have na so goes to 568
@@ -116,19 +287,92 @@ demog <- merge(demog,df, by = c("SUBJECT_ID") )
 
 #reported_ga is only for minimum recorded visit for each individual
 Varnames <- c("mean_vaginal_ph", "number of visits", "reported_ga", "mean_alpha_div", "average income", 
-              "time between visits", "gestational age at delivery", "vaginal ph",
-            "BMI", "birth weight (kg)", "vaginal delivery")
+              "average education", "average age", "average p_care_start", "average inf_trt", 
+              "average  v_discharge", "average v_odor", "average v_itching", "average douche", 
+              "average bv_history", "average vaginitis_history", "average current_medications",
+              "average smoker_current", "average alcohol_frequency", "average diabetes", 
+              "average no_false_labor", "average no_high_bp", "average no_vbleeding", "average progesterone")
 #racial breakdown, break down visits and other demographics
 stratified1 = tableone::CreateTableOne(
-  vars = Varnames[1:5],
+  vars = Varnames[1:4],
   data = summarytools::unlabel(demog), strata = "race", includeNA = TRUE)
+stratified2 = tableone::CreateTableOne(
+  vars = Varnames[5:7],
+  data = summarytools::unlabel(demog), strata = "race", includeNA = TRUE)
+stratified3 = tableone::CreateTableOne(
+  vars = Varnames[8:15],
+  data = summarytools::unlabel(demog), strata = "race", includeNA = TRUE)
+stratified4 = tableone::CreateTableOne(
+  vars = Varnames[16:19],
+  data = summarytools::unlabel(demog), strata = "race", includeNA = TRUE)
+stratified5 = tableone::CreateTableOne(
+  vars = Varnames[20:23],
+  data = summarytools::unlabel(demog), strata = "race", includeNA = TRUE)
+
+```
+
+```{r }
 #stratified1 <- print(stratified1, printToggle = FALSE, showAllLevels = FALSE)
 #stratified1 = stratified1[,!(colnames(stratified1) %in% "test")]%>%
 #  knitr::kable(format="latex")%>% 
 #  kable_styling("striped", full_width = F, font_size = 9)
 stratified1
-
+#fix the part where every race is shown, probably due to meta being called
 ```
+
+```{r }
+#stratified1 <- print(stratified1, printToggle = FALSE, showAllLevels = FALSE)
+#stratified1 = stratified1[,!(colnames(stratified1) %in% "test")]%>%
+#  knitr::kable(format="latex")%>% 
+#  kable_styling("striped", full_width = F, font_size = 9)
+stratified2
+#fix the part where every race is shown, probably due to meta being called
+```
+
+```{r }
+#stratified1 <- print(stratified1, printToggle = FALSE, showAllLevels = FALSE)
+#stratified1 = stratified1[,!(colnames(stratified1) %in% "test")]%>%
+#  knitr::kable(format="latex")%>% 
+#  kable_styling("striped", full_width = F, font_size = 9)
+stratified3
+#fix the part where every race is shown, probably due to meta being called
+```
+
+```{r }
+#stratified1 <- print(stratified1, printToggle = FALSE, showAllLevels = FALSE)
+#stratified1 = stratified1[,!(colnames(stratified1) %in% "test")]%>%
+#  knitr::kable(format="latex")%>% 
+#  kable_styling("striped", full_width = F, font_size = 9)
+stratified4
+#fix the part where every race is shown, probably due to meta being called
+```
+
+```{r }
+#stratified1 <- print(stratified1, printToggle = FALSE, showAllLevels = FALSE)
+#stratified1 = stratified1[,!(colnames(stratified1) %in% "test")]%>%
+#  knitr::kable(format="latex")%>% 
+#  kable_styling("striped", full_width = F, font_size = 9)
+stratified5
+#fix the part where every race is shown, probably due to meta being called
+```
+
+```{r}
+#Find out individuals who have a different vagitype across visits
+uniq_vagitype <- full_set %>%
+  group_by(SUBJECT_ID) %>%
+  summarize(n_unique = n_distinct(vagitype))
+more_vagitype <- uniq_vagitype %>%
+  filter(n_unique > 1)
+full_set %>%
+  filter(SUBJECT_ID %in% more_vagitype$SUBJECT_ID) %>%
+  group_by(SUBJECT_ID) %>%
+  distinct(vagitype)
+
+#Look at proportional changes over time, look at differences betweeen those that did change and those that did not
+#Look at how they change, if they change similarly
+```
+
+
 
 ```{r}
 
@@ -159,22 +403,25 @@ ggarrange(iners, crisp, bvab, gard, gass, nrow = 3)
 #ggplot(full_set, aes(reported_ga, p_Iners)) + 
 #  geom_line(aes(group=SUBJECT_ID, color=race)) + 
 #  facet_wrap(~race, ncol=1)
+
+
+#Look at those with the specific taxa as their vagitype
 ```
 
 
 ```{r}
-prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram()
+prop_plot <- ggplot(full_set, aes(p_Iners)) + geom_histogram() + geom_vline(xintercept=mean(full_set$p_Iners), lwd=1, linetype=2, color="red") + geom_vline(xintercept=median(full_set$p_Iners), lwd=1, linetype=2, color="green")
 #prop_plot
-cprop_plot <- ggplot(full_set, aes(p_Crisp)) + geom_histogram() 
+cprop_plot <- ggplot(full_set, aes(p_Crisp)) + geom_histogram() + geom_vline(xintercept=mean(full_set$p_Crisp), lwd=1, linetype=2, color="red") + geom_vline(xintercept=median(full_set$p_Crisp), lwd=1, linetype=2, color="green")
 #iprop_plot
 
-bprop_plot <- ggplot(full_set, aes(p_BVAB)) + geom_histogram() 
+bprop_plot <- ggplot(full_set, aes(p_BVAB)) + geom_histogram() + geom_vline(xintercept=mean(full_set$p_BVAB), lwd=1, linetype=2, color="red") + geom_vline(xintercept=median(full_set$p_BVAB), lwd=1, linetype=2, color="green")
 #pprop_plot
 
-gprop_plot <- ggplot(full_set, aes(p_Gard)) + geom_histogram()
+gprop_plot <- ggplot(full_set, aes(p_Gard)) + geom_histogram() + geom_vline(xintercept=mean(full_set$p_Gard), lwd=1, linetype=2, color="red") + geom_vline(xintercept=median(full_set$p_Gard), lwd=1, linetype=2, color="green")
 #tprop_plot
 
-gasprop_plot <- ggplot(full_set, aes(Gass)) + geom_histogram()
+gasprop_plot <- ggplot(full_set, aes(Gass)) + geom_histogram() + geom_vline(xintercept=mean(full_set$Gass), lwd=1, linetype=2, color="red") + geom_vline(xintercept=median(full_set$Gass), lwd=1, linetype=2, color="green")
 #bprop_plot
 #stratify by race
 ggarrange(prop_plot, cprop_plot, bprop_plot, gprop_plot, gasprop_plot, labels = c("Iners","Crisp", "BVAB", "Gard", "Gass"), ncol = 3, nrow = 2)
@@ -277,11 +524,7 @@ linpred <- predict(mixedL)
 #y-axis visits for that person
 plot(full_set$p_Iners[which(names(linpred) %in% rownames(full_set))], linpred)
 ```
-1.add more covariates (vagitype, socioe) 
 
-2. dichotomize, try different taxa
-
-3. aa vs caucasian
 
 ```{r}
 full_set$class_Iners <- as.factor(ifelse(full_set$p_Iners > mean(full_set$p_Iners), "High", "Low"))
@@ -289,6 +532,10 @@ full_set$class_Crisp <- as.factor(ifelse(full_set$p_Crisp > mean(full_set$p_Cris
 full_set$class_Gass <- as.factor(ifelse(full_set$Gass > mean(full_set$Gass), "High", "Low"))
 full_set$class_Gard <- as.factor(ifelse(full_set$p_Gard > mean(full_set$p_Gard), "High", "Low"))
 full_set$class_BVAB <- as.factor(ifelse(full_set$p_BVAB > mean(full_set$p_BVAB), "High", "Low"))
+
+
+#Check median
+#add line to show where each point is
 ```
 
 
@@ -301,30 +548,194 @@ prev_plot <- ggplot(full_set, aes(class_Gard)) + geom_bar()
 bvab_plot <- ggplot(full_set, aes(class_BVAB)) + geom_bar()
 
 ggarrange(iners_plot, snea_plot, tm_plot, prev_plot, bvab_plot, labels = c("Iners", "Crisp", "Gass", "Gard", "BVAB1"), ncol = 3, nrow = 2)
+
+
 ```
 
 ```{r}
 #Distribution of High and Low (do it across race)
-irace_prop_plot <- ggplot(full_set, aes(class_Iners)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("Iners Dichotomized Histogram")
+irace_prop_plot <- ggplot(full_set, aes(class_Iners)) + geom_bar(aes(y= stat(prop),group=race, fill=race), position = "dodge2")+ ggtitle("Iners Dichotomized Histogram")
 irace_prop_plot
 
 #Distribution of High and Low (do it across race)
-srace_prop_plot <- ggplot(full_set, aes(class_Crisp)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("Crisp Dichotomized Histogram")
-srace_prop_plot
+srace_prop_plot <- ggplot(full_set, aes(class_Crisp)) + geom_bar(aes(y= stat(prop), group=race, fill=race), position = "dodge2") + ggtitle("Crisp Dichotomized Histogram")
+
 
 #Distribution of High and Low (do it across race)
-prace_prop_plot <- ggplot(full_set, aes(class_Gass)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("Gass Dichotomized Histogram")
-prace_prop_plot
+prace_prop_plot <- ggplot(full_set, aes(class_Gass)) + geom_bar(aes(y= stat(prop), group=race, fill=race), position = "dodge2") +  ggtitle("Gass Dichotomized Histogram")
+
 
 #Distribution of High and Low (do it across race)
-trace_prop_plot <- ggplot(full_set, aes(class_Gard)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("Gard Dichotomized Histogram")
-trace_prop_plot
+trace_prop_plot <- ggplot(full_set, aes(class_Gard)) + geom_bar(aes(y= stat(prop), group=race, fill=race), position = "dodge2") + ggtitle("Gard Dichotomized Histogram")
+
 
 #Distribution of High and Low (do it across race)
-brace_prop_plot <- ggplot(full_set, aes(class_BVAB)) + geom_bar(aes(group=race, fill=race)) + facet_wrap(~race, ncol=3) + ggtitle("BVAB Dichotomized Histogram")
-brace_prop_plot
+brace_prop_plot <- ggplot(full_set, aes(class_BVAB)) + geom_bar(aes(y= stat(prop),group=race, fill=race), position = "dodge2") + ggtitle("BVAB Dichotomized Histogram")
+
 
 ggarrange(irace_prop_plot, srace_prop_plot, prace_prop_plot, trace_prop_plot, brace_prop_plot, nrow = 3)
+#Use proportions instead of counts for better comparison, DONE
+#position dodge, DONE
+#Add proportion values to top of bars
+#do facet wrap by taxa
+```
+
+
+```{r }
+taxa.glm <- function(df, taxon, type, model){
+  tax_count <- df[,taxon]
+  tax_prop <- df[,taxon]/df[,"num_reads"]
+  class_tax <- as.factor(ifelse(tax_prop > mean(tax_prop), "High", "Low"))
+  class_tax <- recode(class_tax, "High"= 1, "Low"= 0)
+  if(model == "fixed"){
+    covs <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "income", "bv_history", "phys", "antibiotics_current","age", "education", "prenatal_care_start", "infertility_treatment", "vdischarge", "vodor", "vitching", "douche", "vaginitis_history", "current_medications", "smoker_current", "alcohol_frequency_year", "diabetes", "no_false_labor", "no_high_bp", "no_vbleeding", "progesterone")
+    model_data <- df[,covs]
+    half <- paste(covs, collapse= "+")
+  }
+  else{
+    covs <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "income", "bv_history", "phys", "antibiotics_current","age", "education", "prenatal_care_start", "infertility_treatment", "vdischarge", "vodor", "vitching", "douche", "vaginitis_history", "current_medications", "smoker_current", "alcohol_frequency_year", "diabetes", "no_false_labor", "no_high_bp", "no_vbleeding", "progesterone")
+    model_data <- df[,c(covs, "SUBJECT_ID", "num_reads")]
+    half <- paste(paste(covs, collapse= "+"), " + (1|SUBJECT_ID)")
+  }
+  if(type == "count"){
+    model_data <- cbind(tax_count, model_data)
+    no.na.data <- na.omit(model_data)
+    form <- as.formula(paste("tax_count ~ ", half))
+    if(model == "fixed"){
+      mod <- glm.nb(form, data = no.na.data)
+    }
+    else{
+      mod <- glmer.nb(form, data = no.na.data)
+    }
+  }
+  else if(type == "prop"){
+    model_data <- cbind(tax_prop, model_data)
+    no.na.data <- na.omit(model_data)
+    form <- as.formula(paste("tax_prop ~ ", half))
+    if(model == "fixed"){
+      mod <- glm(form, data = no.na.data, family = quasibinomial(link = "logit"))
+      return(mod)
+    }
+    else{
+      mod <- glmer(form, data = no.na.data, weights = num_reads, family = "binomial")
+      return(mod)
+    }
+  }
+  else{
+    model_data <- cbind(class_tax, model_data)
+    no.na.data <- na.omit(model_data)
+    form <- as.formula(paste("class_tax ~ ", paste(covs, collapse= "+")))
+    if(model == "fixed"){
+      mod <- glm(form, data = no.na.data, family = binomial)
+    }
+    else{
+      mod <- glmer(form, data = no.na.data, family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+    }
+  }
+  #step.model <- stepAIC(fixed_mod, direction = "both", trace = FALSE)
+  step.back <- stepAIC(mod, direction = "backward")
+  return(step.back)
+  #TO ADD: Plot for each covariate the predicted distribution
+
+}
+
+model_plot <- function(model){
+  final_covs <- names(model$model)[-1]
+  print(deparse(substitute(model)))
+  print(as.formula(paste("class_tax ~ ", paste(final_covs, collapse= "+"))))
+  #Plot AIC for model
+  vars <- unlist(lapply(strsplit(as.character(model$anova$Step), '- ', fixed = TRUE), '[', 2))
+  vars[1] <- "Intercept"
+  AIC.res <- data.frame(Variable = vars, AIC = model$anova$AIC)
+  AIC.res$Variable <- factor(AIC.res$Variable, levels = vars)
+  #true variables
+  #true_vars <- paste0("var", 1:10)
+  #colour_vars <- ifelse(AIC.res$Variable %in% true_vars, 'red','black')
+  plot <- ggplot(data=AIC.res, aes(x=Variable, y=AIC, group=1)) +
+    geom_line(color = "red")+
+    theme_bw()+
+    theme(axis.text.x = element_text(angle = 60, hjust = 1))
+  return(plot)
+}
+
+pred_plot <- function(df, model){
+  model_data <- df[,covs]
+  model_data <- cbind(class_tax, model_data)
+  no.na.data <- na.omit(model_data)
+  final_covs <- names(model$model)[-1]
+  pred_data <- no.na.data[,final_covs]
+  return(predict(model, newdata=pred_data, type = "response"))
+  
+  
+  
+  # if(c("alpha_div","vagitype") %in% names(model$model)){
+  #   plotting_dfm <- expand.grid(alpha_div = seq(0, 3.5, 0.01),
+  #                          vagitype = c("Lactobacillus_crispatus_cluster", "Lactobacillus_iners", "Lachnospiraceae_BVAB1", "Gardnerella_vaginalis", "Lactobacillus_gasseri_cluster"))
+  #   plotting_dfm$preds <- predict(model, newdata=plotting_dfm, type = "response")
+  #   pl <- ggplot(plotting_dfm, aes(x=alpha_div, y =preds, color=as.factor(vagitype))) +
+  #     geom_point( ) +
+  #     ggtitle("Predicted High/Low by Alpha_Div and Vagitype")
+  #   return(p1)
+  # }
+  # else{
+  #   return ("No value")
+  # }
+}
+
+```
+
+
+```{r}
+count_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "count", "fixed")
+prop_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "prop", "fixed")
+class_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "class", "fixed")
+mcount_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "count", "mixed")
+mprop_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "prop", "mixed") #failure to converge in 10000 evaluations
+
+covs <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "income", "bv_history", "phys", "antibiotics_current","age", "education", "prenatal_care_start", "infertility_treatment", "vdischarge", "vodor", "vitching", "douche", "vaginitis_history", "current_medications", "smoker_current", "alcohol_frequency_year", "diabetes", "no_false_labor", "no_high_bp", "no_vbleeding", "progesterone")
+model_data <- full_set[,c(covs[1:3])]
+ggpairs(model_data, title = "correlogram") #too many points, too many vagitypes as well so had to remove
+```
+
+
+```{r }
+mod_Crisp <- taxa.glm(full_set, "Lactobacillus_crispatus_cluster", "mean", "fixed")
+mod_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "mean", "fixed")
+mod_BVAB <- taxa.glm(full_set, "Lachnospiraceae_BVAB1", "mean", "fixed")
+mod_Gard <- taxa.glm(full_set, "Gardnerella_vaginalis", "mean", "fixed")
+mod_Gass <- taxa.glm(full_set, "Lactobacillus_gasseri_cluster", "mean", "fixed")
+
+#predictions <- pred_plot(full_set, mod_Iners)
+
+med_Crisp <- taxa.glm(full_set, "Lactobacillus_crispatus_cluster", "median", "fixed")
+med_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "median", "fixed")
+med_BVAB <- taxa.glm(full_set, "Lachnospiraceae_BVAB1", "median", "fixed")
+med_Gard <- taxa.glm(full_set, "Gardnerella_vaginalis", "median", "fixed")
+med_Gass <- taxa.glm(full_set, "Lactobacillus_gasseri_cluster", "median", "fixed")
+
+#lapply(models, model_plot)
+
+
+ggarrange(model_plot(mod_Crisp), model_plot(med_Crisp), labels = c("Mean_Crisp", "Median_Crisp"))
+ggarrange(model_plot(mod_Iners), model_plot(med_Iners), labels = c("Mean_Iners", "Median_Iners"))
+ggarrange(model_plot(mod_BVAB), model_plot(med_BVAB), labels = c("Mean_BVAB1", "Median_BVAB1"))
+ggarrange(model_plot(mod_Gard), model_plot(med_Gard), labels = c("Mean_Gard", "Median_Gard"))
+ggarrange(model_plot(mod_Gass), model_plot(med_Gass), labels = c("Mean_Gass", "Median_Gass"))
+
+#alpha_div and vagitype show up in almost every model vaginal_pH in most of them
+#correlations between data
+#longitudinal plots when stratifying by covariates
+#count and proportion plots
+#Look at model pre and post aic
+#ggaly and regular correlation matrix
+#Look at distribution of NA's in covariate (pre-filtering) and see if it affects model by removing it
+```
+
+
+```{r }
+mixed_Iners <- taxa.glm(full_set, "Lactobacillus_crispatus_cluster", "mean", "mixed")
+#Some linear combination of the parameters perfectly separates failure from successes, I assume it's vagitype
+#Doesn't run still
 
 ```
 
@@ -336,23 +747,52 @@ na.test <-  function (x) {
     stop(paste("All NA in columns", paste(which(w), collapse=", ")))
   }
 }
-#Logistic Regression Classifier
-#AICstepwise
-#Add more variables
-take_out <- c('SUBJECT_ID', names(t_otu), 'p_Iners', 'class_Iners')
-form <- paste0(setdiff(names(full_set), c(names(full_set[,apply(full_set, 2, function(x) any(is.na(x)))]),names(full_set[,apply(full_set, 2, function(x) any(n_distinct(x) == 1))]),'SUBJECT_ID', names(t_otu), 'p_Iners', 'class_Iners')), collapse = " + ")
-form <- paste0(form, "+ reported_ga + vaginal_pH + (1|SUBJECT_ID)")
-form <- as.formula(paste("class_Iners", '~', form))
+#Recode High to 1 and Low to 0
+full_set[["class_Iners"]] <- recode(full_set[["class_Iners"]], "High"= 1, "Low"= 0)
+full_set$class_Iners <- as.factor(full_set$class_Iners)
 
-#does not appear that using all of the possible variables works for log regression, also tried with less
-#variables and got same resuts
 
-log_mod <- glmer(form, data = full_set, family = binomial) #Does not run
+covs <- c("class_Iners", "vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "income", "bv", "phys", "antibiotics_current","SUBJECT_ID")
+model_data <- full_set[,covs]
+no.na.data <- na.omit(model_data)
 
+reduced_mod <- glmer(class_Iners ~ alpha_div + vagitype + (1|SUBJECT_ID), data = no.na.data, family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) #Unable to evaluate scaled gradient, model fails to converge
 step.model <- stepAIC(log_mod, direction = "both", 
                       trace = FALSE)
+#install.packages("ResourceSelection")
+library(ResourceSelection)
+
+fixed_mod <- glm(class_Iners ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + income + phys + bv + antibiotics_current, data = no.na.data, family = binomial) 
+step.model <- stepAIC(fixed_mod, direction = "both", 
+                      trace = FALSE)
+step.back <- stepAIC(fixed_mod, direction = "backward")
+hoslem.test(no.na.data$class_Iners, fitted(fixed_mod))
+hoslem.test(no.na.data$class_Iners, fitted(step.model))
+# model becomes class_Iners ~ alpha_div + vagitype
+predict(fixed_mod, type = "response")
+histogram(predict(fixed_mod, type = "response"))
+plot(predict(fixed_mod, type = "response"), full_set$class_Iners)
 
 
+
+plotting_dfm <- expand.grid(alpha_div = seq(0, 3.5, 0.01),
+                           vagitype = c("Lactobacillus_crispatus_cluster", "Lactobacillus_iners", "Lachnospiraceae_BVAB1", "Gardnerella_vaginalis", "Lactobacillus_gasseri_cluster"))
+plotting_dfm$preds <- predict(step.model, newdata=plotting_dfm, type = "response")
+pl <- ggplot(plotting_dfm, aes(x=alpha_div, y =preds, color=as.factor(vagitype)))
+pl + 
+  geom_point( ) +
+  ggtitle("Predicted High/Low by Alpha_Div and Vagitype")
+
+#Look at alpha div and vagitype over trimesters and see how it changes 
+# plot those who change
+#Table of amt that change vs not change
+```
+
+```{r }
+reduced_mod <- glmer(class_Crisp ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + income + (1|SUBJECT_ID), data = full_set, family = binomial) #Does not converge
+reduced_mod <- glmer(class_Gass ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + income + (1|SUBJECT_ID), data = full_set, family = binomial) #Does not converge
+reduced_mod <- glmer(class_Gard ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + income + (1|SUBJECT_ID), data = full_set, family = binomial) #Does not converge
+reduced_mod <- glmer(class_BVAB ~ vaginal_pH + reported_ga + alpha_div + race + vagitype + income + (1|SUBJECT_ID), data = full_set, family = binomial) #Does not converge
 ```
 
 ```{r}
@@ -520,10 +960,4 @@ svm_model <- svm(class_BVAB ~ vaginal_pH + reported_ga + alpha_div + race + vagi
 pred <- predict(svm_model, covs)
 table(pred, full_set$class_BVAB[which(names(pred) %in% rownames(full_set))])
 ```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
 

@@ -2,11 +2,6 @@
 title: "Modeling"
 output: html_notebook
 ---
-
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
-
 ```{r}
 rm(list=ls())
 require(ggplot2)
@@ -31,6 +26,13 @@ library(lme4)
 library(MASS)
 library(forcats)
 library(GGally)
+library(lmerTest)
+library(gridExtra)
+library(ggfortify)
+library(performance)
+library(plotly)
+library(ggrepel)
+library(factoextra)
 #remotes::install_github("palday/coefplot2",
 #           subdir = "pkg")
 library(coefplot2)
@@ -126,7 +128,7 @@ meta <- meta %>%
   mutate(progesterone = replace_na(progesterone, "No")) %>%
   mutate(progesterone = recode(progesterone, Not_Sure = "No", .default = levels(meta$progesterone)))
 
-
+levels(meta$age)[1] <- NA
 ```
 
 
@@ -580,6 +582,38 @@ ggarrange(irace_prop_plot, srace_prop_plot, prace_prop_plot, trace_prop_plot, br
 #do facet wrap by taxa
 ```
 
+```{r}
+covs.taxa <- function(df, taxon, model, vars){
+  tax_prop <- df[,taxon]/df[,"num_reads"]
+   if(model == "fixed"){
+    #covs <- vars
+    model_data <- df[,vars]
+    half <- paste(vars, collapse= "+")
+  }
+  else{
+    #covs <- vars
+    model_data <- df[,c(vars, "SUBJECT_ID", "num_reads")]
+    half <- paste(paste(vars, collapse= "+"), " + (1|SUBJECT_ID)")
+  }
+  model_data <- cbind(tax_prop, model_data)
+  no.na.data <- na.omit(model_data)
+  form <- as.formula(paste("tax_prop ~ ", half))
+  if(model == "fixed"){
+    mod <- lm(form, data = no.na.data)
+    step.back <- stepAIC(mod, direction = "backward")
+    return(step.back)
+    #return(mod)
+  }
+  else{
+    mod <- lmer(form, data = no.na.data)
+    return(mod)
+    #return(mod.step)
+  }
+}
+
+
+```
+
 
 ```{r }
 taxa.glm <- function(df, taxon, type, model){
@@ -613,12 +647,13 @@ taxa.glm <- function(df, taxon, type, model){
     no.na.data <- na.omit(model_data)
     form <- as.formula(paste("tax_prop ~ ", half))
     if(model == "fixed"){
-      mod <- glm(form, data = no.na.data, family = quasibinomial(link = "logit"))
-      return(mod)
+      mod <- lm(form, data = no.na.data)
+      #return(mod)
     }
     else{
-      mod <- glmer(form, data = no.na.data, weights = num_reads, family = "binomial")
+      mod <- lmer(form, data = no.na.data)
       return(mod)
+      #return(mod.step)
     }
   }
   else{
@@ -633,12 +668,14 @@ taxa.glm <- function(df, taxon, type, model){
     }
   }
   #step.model <- stepAIC(fixed_mod, direction = "both", trace = FALSE)
-  step.back <- stepAIC(mod, direction = "backward")
+  step.back <- stepAIC(mod, direction = "backward", trace = FALSE)
   return(step.back)
   #TO ADD: Plot for each covariate the predicted distribution
-
+  #Output table of common variables, extract p-value
 }
+```
 
+```{r }
 model_plot <- function(model){
   final_covs <- names(model$model)[-1]
   print(deparse(substitute(model)))
@@ -657,7 +694,9 @@ model_plot <- function(model){
     theme(axis.text.x = element_text(angle = 60, hjust = 1))
   return(plot)
 }
+```
 
+```{r }
 pred_plot <- function(df, model){
   model_data <- df[,covs]
   model_data <- cbind(class_tax, model_data)
@@ -684,43 +723,402 @@ pred_plot <- function(df, model){
 
 ```
 
+```{r}
+get_data <- function(taxon, df){
+  tax_prop <- df[,taxon]/df[,"num_reads"]
+  covs <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "vagitype", "income", "bv_history", "phys", "antibiotics_current","age", "education", "prenatal_care_start", "infertility_treatment", "vdischarge", "vodor", "vitching", "douche", "vaginitis_history", "current_medications", "smoker_current", "alcohol_frequency_year", "diabetes", "no_false_labor", "no_high_bp", "no_vbleeding", "progesterone")
+  model_data <- df[,c(covs, "SUBJECT_ID", "num_reads")]
+  model_data <- cbind(tax_prop, model_data)
+  no.na.data <- na.omit(model_data)
+  return(no.na.data)
+}
+```
 
 ```{r}
-count_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "count", "fixed")
-prop_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "prop", "fixed")
-class_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "class", "fixed")
-mcount_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "count", "mixed")
-mprop_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "prop", "mixed") #failure to converge in 10000 evaluations
+make_hists<- function(model, taxon, df, vars){
+  hists <- data.frame(xx = c(predict(model, newdata = get_data(taxon, df)[, vars]), get_data(taxon, df)[, "tax_prop"]), yy = rep(c("pred", "actual"),each = length(get_data(taxon, df)[, "tax_prop"])))
+  return(ggplot(hists, aes(x=xx, fill=yy)) + geom_histogram(alpha=0.2, position="identity"))
+}
 
-covs <- c("vaginal_pH", "reported_ga", "alpha_div", "race", "income", "bv_history", "phys", "antibiotics_current","age", "education", "prenatal_care_start", "infertility_treatment", "vdischarge", "vodor", "vitching", "douche", "vaginitis_history", "current_medications", "smoker_current", "alcohol_frequency_year", "diabetes", "no_false_labor", "no_high_bp", "no_vbleeding", "progesterone")
-model_data <- full_set[,c(covs[1:3])]
-ggpairs(model_data, title = "correlogram") #too many points, too many vagitypes as well so had to remove
+```
+
+```{r}
+agg_plot <- function(model, taxon, df, vars){
+  ex <- data.frame(data = c(predict(model, newdata = get_data(taxon, df)[, vars]), get_data(taxon, df)[, "tax_prop"]), 
+                   race = get_data(taxon, df)[, "race"], tri = get_data(taxon, df)[, "reported_ga"],
+                   yy = rep(c("pred", "actual"),each = length(get_data(taxon, df)[, "tax_prop"])))
+  agg_table <- aggregate(list(ex$data), by = list(ex$race, ex$tri, ex$yy), mean)
+  colnames(agg_table) <- c("race", "tri", "type", "data")
+  agg_plot <- ggplot(agg_table, aes(tri, data)) + 
+geom_line(aes(group=interaction(race, type), color=race, linetype = type)) + 
+    scale_x_discrete(labels=c("First Trimester" = "1st", "Second Trimester" = "2nd",
+                              "Third Trimester" = "3rd")) + 
+    ylab("Prop")
+  return(agg_plot)
+}
+
+```
+
+```{r}
+getPerformace <- function(model, df){
+  taxa <- colnames(t_otu)
+  example <- c("Lactobacillus_iners", "Lactobacillus_crispatus_cluster", "Gardnerella_vaginalis", "Lachnospiraceae_BVAB1", "Lactobacillus_gasseri_cluster", "Sneathia_amnii", "Prevotella_cluster2", "TM7_OTU-H1")
+  for (name in example){
+    md <- covs.taxa
+  }
+  perf <- model_performance(model, metrics = "all", verbose = TRUE)
+  return(perf)
+  
+}
+
+
+```
+
+```{r}
+subsetFull <- function(df, taxalist){
+  `%ni%` <- Negate(`%in%`)
+  cols <- sapply(taxalist, function (x) any(df[,x]/df$num_reads > 0.05))
+  df <- subset(df,select = names(df) %ni% names(which(cols == FALSE)))
+  return(df)
+}
+  
+
+```
+
+```{r}
+covs <- c("vaginal_pH", "alpha_div", "reported_ga", "race", "income", "bv_history", "phys", "antibiotics_current","age", "education", "prenatal_care_start", "infertility_treatment", "vdischarge", "vodor", "vitching", "douche", "vaginitis_history", "current_medications", "smoker_current", "alcohol_frequency_year", "diabetes", "no_false_labor", "no_high_bp", "no_vbleeding", "progesterone")
+model_data <- full_set[,covs]
+ggpairs(model_data, columns = 1:2, ggplot2::aes(colour=race)) #too many points, too many vagitypes as well so had to remove
+#do top 5 vagitypes
+aa <- full_set[full_set$race == 'african_american',]
+histogram(aa$vaginal_pH)
 ```
 
 
+```{r CompareModelType}
+count_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "count", "fixed") #Does not converge
+prop_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "prop", "fixed")
+class_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "class", "fixed")
+mcount_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "count", "mixed") #Does not converge
+mprop_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "prop", "mixed") #failure to converge in 10000 evaluations
+mod_Crisp <- taxa.glm(full_set, "Lactobacillus_crispatus_cluster", "class", "fixed")
+mod_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "class", "fixed")
+mod_BVAB <- taxa.glm(full_set, "Lachnospiraceae_BVAB1", "class", "fixed")
+mod_Gard <- taxa.glm(full_set, "Gardnerella_vaginalis", "class", "fixed")
+mod_Gass <- taxa.glm(full_set, "Lactobacillus_gasseri_cluster", "class", "fixed")
+
+
+taxalist <- c("Lactobacillus_crispatus_cluster", "Lactobacillus_iners", "Lachnospiraceae_BVAB1", "Gardnerella_vaginalis", "Lactobacillus_gasseri_cluster")
+var_df <- data.frame(matrix(ncol = 15, nrow = 15))
+#colnames(var_df) <- taxalist
+count <- 0
+for(ind in c(1:length(taxalist))){
+  mods <- taxa.glm(full_set, taxalist[ind], "prop", "mixed")
+  no.na.data <- get_data(taxalist[ind], full_set)
+  step.back <- lmerTest::step(mods)
+  fix_vars <- c(rownames(step.back$fixed[which(step.back$fixed$Eliminated == 0),]), rownames(step.back$random[which(step.back$random$Eliminated == 0),]))
+  for(i in c(1:length(fix_vars))){
+    var_df[i,ind+count] <- fix_vars[i]
+  }
+  fixed_mods <- taxa.glm(full_set, taxalist[ind], "prop", "fixed")
+  fixed_vars <- names(fixed_mods$model)[-1]
+  for(i in c(1:length(fixed_vars))){
+    var_df[i,ind+1+count] <- fixed_vars[i]
+  }
+  class_mods <- taxa.glm(full_set, taxalist[ind], "class", "fixed")
+  class_vars <- names(class_mods$model)[-1]
+  for(i in c(1:length(class_vars))){
+    var_df[i,ind+2+count] <- class_vars[i]
+  }
+  count <- count + 2
+}
+
+colnames(var_df) <- c("Crisp_P_M", "Crisp_P_F", "Crisp_C_F", "Iners_P_M", "Iners_P_F","Iners_C_F", "BVAB1_P_M", "BVAB1_P_F","BVAB1_C_F","Gard_P_M", "Gard_P_F", "Gard_C_F","Gass_P_M","Gass_P_F", "Gass_C_F")
+options(knitr.kable.NA = '')
+kable(var_df, table.attr = "style = \"color: black;\"") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  add_header_above(c("Crispatus" = 3, "Iners" = 3, "BVAB" = 3, "Gardnerella" = 3, "Gasseri" = 3))
+
+```
+
+```{r}
+#Make table for the variables that are outputted
+#need the data frame
+#alpha div, vagitype, age, smoking, education, subject_id, vaginal_ph, race
+#look at covariate estimates for each taxa model, consider correlations in model
+#forward model selection, one variable addition at a time
+#look at differences between taxa
+#look for vagitypes in rare taxa
+#performance with and without vagitype, compare using model comparison,ANOVA DONE
+#overlay averages across each race across the 3 trimesters, output model metrics, try without and with vagitype: WROTE FUNCTION, APPLY TO ALL TAXA
+#how much does vagitype add in terms of prediction, PLOTS DONE
+#make summaries
+#pca under both smoothed and unsmoother conditions
+#prcomp on raw data, scale variables to same unit
+
+vars <- c("vaginal_pH", "alpha_div", "race", "vagitype", "age", "education", "smoker_current")
+mx_vars<- c("vaginal_pH", "alpha_div", "race", "vagitype", "age", "education", "smoker_current", "reported_ga","SUBJECT_ID")
+mx_type <- c("vaginal_pH", "alpha_div", "race", "age", "education", "smoker_current", "reported_ga","SUBJECT_ID")
+no_type <- c("vaginal_pH", "alpha_div", "race", "age", "education", "smoker_current")
+
+#predict based on these models
+
+taxalist <- c("Lactobacillus_iners", "Lactobacillus_crispatus_cluster", "Gardnerella_vaginalis", "Lachnospiraceae_BVAB1", "Lactobacillus_gasseri_cluster", "Sneathia_amnii", "Prevotella_cluster2", "TM7_OTU-H1")
+tax_plots <- list()
+tax_hists <- list()
+
+#taxalist <- c("Lactobacillus_iners", "Lactobacillus_crispatus_cluster")
+for (taxa in taxalist){
+ mixed_full <- covs.taxa(full_set, taxa, "mixed", vars)
+ mixed_notype <- covs.taxa(full_set, taxa, "mixed", no_type)
+ print(taxa)
+ print(anova(mixed_full, mixed_notype))
+ #print(summary(mixed_notype))
+ var = paste(taxa, "Full", sep = "_")
+ var2 = paste(taxa, "NoType", sep = "_")
+ tax_plots[[var]] <- agg_plot(mixed_full, taxa, full_set, mx_vars) + ggtitle(var)
+ tax_plots[[var2]] <- agg_plot(mixed_notype, taxa, full_set, mx_type) + ggtitle(var2)
+ tax_hists[[var]] <- make_hists(mixed_full, taxa, full_set, mx_vars) + ggtitle(var)
+ tax_hists[[var2]] <- make_hists(mixed_notype, taxa, full_set, mx_type) + ggtitle(var2)
+}
+new_list = c("Lactobacillus_iners", "Lactobacillus_crispatus_cluster", "Gardnerella_vaginalis", "Lachnospiraceae_BVAB1", "Lactobacillus_gasseri_cluster")
+perf <- data.frame()
+predFrame <- data.frame()
+see <- subsetFull(full_set, names(t_otu))
+updated <- t_otu[,(names(t_otu) %in% names(see))]
+
+#comb <- data.frame()
+for (taxa in names(updated)){
+  mixed_full <- covs.taxa(see, taxa, "mixed", vars)
+  if (taxa %in% new_list){
+    orig <- paste(taxa, "Orig", sep = "_")
+    predicted <- paste(taxa, "Pred", sep = "_")
+    pre_dat <- getData(mixed_full)
+    pred <- predict(mixed_full)
+    comb[1:length(pred),c(orig, predicted)] <- cbind(pre_dat[,c("tax_prop", "SUBJECT_ID")], pred)
+    # comb <- comb %>%
+    #   rename(!!orig := tax_prop, !!predicted := pred)
+  }
+  var = paste(taxa, "Full", sep = "_")
+  predFrame[1:length(predict(mixed_full)),taxa] <- predict(mixed_full)
+  perf[taxa,names(model_performance(mixed_full, metrics = "all", verbose = TRUE))] <- model_performance(mixed_full, metrics = "all", verbose = TRUE)
+}
+predFrame[predFrame < 0] <- 0
+predFrame[predFrame > 1] <- 1
+comb[comb < 0] <- 0
+comb[comb > 1] <- 1
+comb <- comb[ , c(2, 1, 3:ncol(comb))]
+no_na <- na.omit(full_set[, vars])
+pred_Full <- cbind(predFrame, no_na)
+#Get the actual from the initial model
+#Add in subject_id
+#Truncate, DONE
+```
+
+```{r}
+perf$rankRMSE <- rank(perf$RMSE)
+perf$rankR2Cond <- rank(-perf$R2_conditional)
+perf$Name <- rownames(perf)
+kable(perf,  table.attr = "style = \"color: black;\"") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+#make boxplot for the metrics and look at outliers, use rmse
+#see rank of metrics for specific taxa of interest
+#add column for quantiles for the specific taxa of interest
+
+rmse <- ggplot(perf, aes(x="RMSE", y=RMSE)) + 
+  geom_boxplot() +
+  geom_point(data=subset(perf, rownames(perf) %in% new_list), 
+    aes(x="RMSE", y=RMSE), 
+    color="red", size=5) +
+  geom_text_repel(data=subset(perf, rownames(perf) %in% new_list), aes(label=Name))
+rmse
+
+r2_cond <- ggplot(perf, aes(x="R2_Cond", y=R2_conditional)) + 
+  geom_boxplot() +
+  geom_point(data=subset(perf, rownames(perf) %in% new_list), 
+    aes(x="R2_Cond", y=R2_conditional), 
+    color="red", size=5) +
+  geom_text_repel(data=subset(perf, rownames(perf) %in% new_list), aes(label=Name))
+r2_cond
+```
+
+```{r PredActual}
+grouped <- aggregate(. ~ SUBJECT_ID, comb, mean)
+grouped$rows <- as.numeric(rownames(grouped))
+
+sorted <- comb %>%
+  group_by(SUBJECT_ID) %>%
+  filter(n() > 7)
+sorted <- sorted %>%
+  group_by(SUBJECT_ID) %>%
+  mutate(id = row_number())
+sorted <- ungroup(sorted)
+
+
+ins = ggplot() + 
+  geom_line(data = sorted, aes(x=id, y=Lactobacillus_iners_Orig,group=as.factor(SUBJECT_ID)), color = "blue") +
+  geom_line(data = sorted, aes(x=id, y=Lactobacillus_iners_Pred,group=as.factor(SUBJECT_ID)), color = "red") +
+  xlab('Number of Visits') +
+  ylab('Prop_Iners') +
+  ggtitle("Lactobacillus iners over time")
+ins <- ggplotly(ins)
+ins
+
+crp = ggplot() + 
+  geom_line(data = sorted, aes(x=id, y=Lactobacillus_crispatus_cluster_Orig,group=SUBJECT_ID), color = "blue") +
+  geom_line(data = sorted, aes(x=id, y=Lactobacillus_crispatus_cluster_Pred,group=SUBJECT_ID), color = "red") +
+  xlab('Number of Visits') +
+  ylab('Prop_Crisp') +
+  ggtitle("Lactobacillus crispatus over time")
+crp <- ggplotly(crp)
+crp
+
+grd = ggplot() + 
+  geom_line(data = sorted, aes(x=id, y=Gardnerella_vaginalis_Orig,group=SUBJECT_ID), color = "blue") +
+  geom_line(data = sorted, aes(x=id, y=Gardnerella_vaginalis_Pred,group=SUBJECT_ID), color = "red") +
+  xlab('Number of Visits') +
+  ylab('Prop_Gard') +
+  ggtitle("Gardnerella vaginalis over time")
+grd <- ggplotly(grd)
+grd
+
+bvb = ggplot() + 
+  geom_line(data = sorted, aes(x=id, y=Lachnospiraceae_BVAB1_Orig,group=SUBJECT_ID), color = "blue") +
+  geom_line(data = sorted, aes(x=id, y=Lachnospiraceae_BVAB1_Pred,group=SUBJECT_ID), color = "red") +
+  xlab('Number of Visits') +
+  ylab('Prop_BVAB1') +
+  ggtitle("BVAB1 over time")
+bvb <- ggplotly(bvb)
+bvb
+
+gas = ggplot() + 
+  geom_line(data = sorted, aes(x=id, y=Lactobacillus_gasseri_cluster_Orig,group=SUBJECT_ID), color = "blue") +
+  geom_line(data = sorted, aes(x=id, y=Lactobacillus_gasseri_cluster_Pred,group=SUBJECT_ID), color = "red") +
+  xlab('Number of Visits') +
+  ylab('Prop_Gass') +
+  ggtitle("Lactobacillus gasseri over time") +
+  guides(fill=guide_legend(title="Orig/Pred"))
+gas <- ggplotly(gas)
+gas
+
+
+
+#How to best effectively plot all taxa for predicted vs actual without having too many graphs
+#sindex
+# ggplot(aes(x = hp, y = mpg)) +
+#   geom_smooth(method = "lm", se = FALSE, color = "lightgrey") +
+#   geom_segment(aes(xend = hp, yend = predicted), alpha = .2) +
+# 
+#   # > Color adjustments made here...
+#   geom_point(aes(color = residuals)) +  # Color mapped here
+#   scale_color_gradient2(low = "blue", mid = "white", high = "red") +  # Colors to use here
+#   guides(color = FALSE) +
+#   # <
+# 
+#   geom_point(aes(y = predicted), shape = 1) +
+#   theme_bw()
+
+#Do high, medium, low for residuals
+#Legend
+#Add each subject id, color by id, line type by predicted/acutal
+```
+
+```{r TrimesterPlots}
+marrangeGrob(tax_plots, nrow = 2, ncol = 2)
+```
+
+```{r Histograms}
+marrangeGrob(tax_hists, nrow = 2, ncol = 2)
+```
+
+```{r}
+#add predicted vs actual plot, y = x
+#put table for prediction summary/statistics, See if should add more, 
+#drop all taxa that have proportion of 0.05 or below, DONE
+#which(apply(t_otu, 2, sum) == 0)
+pca_orig <- prcomp(updated, scale = TRUE)
+coords_orig <- pca_orig$x[,1:2]
+#pca_other <- prcomp(otu, scale = TRUE)
+pca_pred <- prcomp(predFrame, scale = TRUE)
+coords_pred <- pca_pred$x[,1:2]
+rot_pre <- pca_pred$rotation[,1:2]
+#pca_predT <- prcomp(t(predFrame), scale = TRUE)
+#print(pca_orig)
+#scriplot, DONE
+#summary(pca_orig)
+ggarrange(autoplot(pca_orig, data = see, colour = "race"),autoplot(pca_pred, data = pred_Full, colour = "race"),
+          labels = c("Orig", "Pred"))
+screeplot(pca_orig)
+screeplot(pca_pred)
+
+fviz_pca_var(pca_orig,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+fviz_pca_var(pca_pred,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+#plot pca for variables and variable loadings, extract subject scores, get coordinates of each point
+#How to limit number of variable loadings to top 10?
+#Overlay on first loading
+#Plot x y for rotational
+```
+
+
+```{r}
+autoplot(pca_pred, data = pred_Full, colour = "race")
+screeplot(pca_pred)
+```
+```{r}
+iners_f_hist <- make_hists(iners_fixed, "Lactobacillus_iners", full_set, vars) + ggtitle("Iners Fixed Plot")
+iners_m_hist <- make_hists(iners_mixed, "Lactobacillus_iners", full_set, mx_vars) + ggtitle("Iners Mixed Plot")
+ggarrange(iners_f_hist, iners_m_hist)
+
+```
+
+```{r}
+crisp_f_hist <- make_hists(crisp_fixed, "Lactobacillus_crispatus_cluster", full_set, vars) + ggtitle("Crisp Fixed Plot")
+crisp_m_hist <- make_hists(crisp_mixed, "Lactobacillus_crispatus_cluster", full_set, mx_vars) + ggtitle("Crisp Mixed Plot")
+ggarrange(crisp_f_hist, crisp_m_hist)
+
+#clean age, set blanks to NA, clean values, make 18-28 reference group
+# do individual plots
+# quantify prediction success
+# get model summaries
+# perform on more taxa
+#education, high_school_ged is baseline, put in order of ascending degree
+
+```
+
 ```{r }
-mod_Crisp <- taxa.glm(full_set, "Lactobacillus_crispatus_cluster", "mean", "fixed")
-mod_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "mean", "fixed")
-mod_BVAB <- taxa.glm(full_set, "Lachnospiraceae_BVAB1", "mean", "fixed")
-mod_Gard <- taxa.glm(full_set, "Gardnerella_vaginalis", "mean", "fixed")
-mod_Gass <- taxa.glm(full_set, "Lactobacillus_gasseri_cluster", "mean", "fixed")
-
 #predictions <- pred_plot(full_set, mod_Iners)
-
-med_Crisp <- taxa.glm(full_set, "Lactobacillus_crispatus_cluster", "median", "fixed")
-med_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "median", "fixed")
-med_BVAB <- taxa.glm(full_set, "Lachnospiraceae_BVAB1", "median", "fixed")
-med_Gard <- taxa.glm(full_set, "Gardnerella_vaginalis", "median", "fixed")
-med_Gass <- taxa.glm(full_set, "Lactobacillus_gasseri_cluster", "median", "fixed")
-
 #lapply(models, model_plot)
 
+mod_Crisp <- taxa.glm(full_set, "Lactobacillus_crispatus_cluster", "class", "fixed")
+mod_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "class", "fixed")
+mod_BVAB <- taxa.glm(full_set, "Lachnospiraceae_BVAB1", "class", "fixed")
+mod_Gard <- taxa.glm(full_set, "Gardnerella_vaginalis", "class", "fixed")
+mod_Gass <- taxa.glm(full_set, "Lactobacillus_gasseri_cluster", "class", "fixed")
 
-ggarrange(model_plot(mod_Crisp), model_plot(med_Crisp), labels = c("Mean_Crisp", "Median_Crisp"))
-ggarrange(model_plot(mod_Iners), model_plot(med_Iners), labels = c("Mean_Iners", "Median_Iners"))
-ggarrange(model_plot(mod_BVAB), model_plot(med_BVAB), labels = c("Mean_BVAB1", "Median_BVAB1"))
-ggarrange(model_plot(mod_Gard), model_plot(med_Gard), labels = c("Mean_Gard", "Median_Gard"))
-ggarrange(model_plot(mod_Gass), model_plot(med_Gass), labels = c("Mean_Gass", "Median_Gass"))
+prop_Crisp <- taxa.glm(full_set, "Lactobacillus_crispatus_cluster", "prop", "fixed")
+prop_Iners <- taxa.glm(full_set, "Lactobacillus_iners", "prop", "fixed")
+prop_BVAB <- taxa.glm(full_set, "Lachnospiraceae_BVAB1", "prop", "fixed")
+prop_Gard <- taxa.glm(full_set, "Gardnerella_vaginalis", "prop", "fixed")
+prop_Gass <- taxa.glm(full_set, "Lactobacillus_gasseri_cluster", "prop", "fixed")
+
+ggarrange(model_plot(mod_Crisp), model_plot(prop_Crisp),labels = c("Class Crisp", "Prop Crisp"))
+ggarrange(model_plot(mod_Iners), model_plot(prop_Iners),labels = c("Class Iners", "Prop Iners"))
+ggarrange(model_plot(mod_BVAB), model_plot(prop_BVAB),labels = c("Class BVAB", "Prop BVAB"))
+ggarrange(model_plot(mod_Crisp), model_plot(prop_Iners),labels = c("Class Gard", "Prop Gard"))
+ggarrange(model_plot(mod_Gass), model_plot(prop_Gass),labels = c("Class Gass", "Prop Gass"))
+model_plot(mod_Crisp) + ggtitle("Class Crispatus")
+model_plot(mod_Iners) + ggtitle("Class Iners")
+model_plot(mod_BVAB) + ggtitle("Class BVAB")
+model_plot(mod_Gard) + ggtitle("Class Gardnerella")
+model_plot(mod_Gass) + ggtitle("Class Gasseri")
 
 #alpha_div and vagitype show up in almost every model vaginal_pH in most of them
 #correlations between data

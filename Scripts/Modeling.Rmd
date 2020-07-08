@@ -33,6 +33,7 @@ library(performance)
 library(plotly)
 library(ggrepel)
 library(factoextra)
+library(lme4)
 #remotes::install_github("palday/coefplot2",
 #           subdir = "pkg")
 library(coefplot2)

@@ -34,6 +34,7 @@ library(plotly)
 library(ggrepel)
 library(factoextra)
 library(lme4)
+library(NBZIMM)
 #remotes::install_github("palday/coefplot2",
 #           subdir = "pkg")
 library(coefplot2)
@@ -469,7 +470,7 @@ summary(neg_binone)
 hist(predict(neg_binone))
 #Zero-Inflated Beta-Binomial Model
 #kostic.y <- cbind(1, kostic.y=="Tumor")
-beta_bin<- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set, family=betabinomial(link = "logit"), zi = ~ vaginal_pH + reported_ga + alpha_div + race)
+# beta_bin<- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set, family=betabinomial(link = "logit"), zi = ~ vaginal_pH + reported_ga + alpha_div + race)
 
 
 #Mixed Linear Regression Model

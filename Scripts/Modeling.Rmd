@@ -453,7 +453,6 @@ ggarrange(race_prop_plot, crace_prop_plot, brace_prop_plot, grace_prop_plot, gas
 z <- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + (1|SUBJECT_ID), data = full_set, family = poisson, zi = ~ vaginal_pH + reported_ga + alpha_div)
 summary(z)
 hist(predict(z))
-plot(full_set$Lactobacillus_iners[which(names(linpred) %in% rownames(full_set))], linpred)
 
 #summary(m1 <- zeroinfl(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div |SUBJECT_ID, data = full_set))
 z <- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + (1|SUBJECT_ID), data = full_set, family = poisson, zi = ~ 0)
@@ -477,6 +476,7 @@ beta_bin<- glmmTMB(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + 
 mixedL <- lmer(Lactobacillus_iners ~ vaginal_pH + reported_ga + alpha_div + race + (1|SUBJECT_ID), data = full_set)
 summary(mixedL)
 linpred <- predict(mixedL)
+plot(full_set$Lactobacillus_iners[which(names(linpred) %in% rownames(full_set))], linpred)
 #predicted
 #x-axis people
 #y-axis visits for that person
